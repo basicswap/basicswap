@@ -10764,7 +10764,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
     def addWatchedScript(
-        self, coin_type, bid_id, script: bytes, tx_type, swap_type=None
+        self, coin_type, bid_id, script: bytes, tx_type, swap_type=None, scan_to=None
     ):
         self.log.debug(
             f"Adding watched script {Coins(coin_type).name} bid {self.log.id(bid_id)} type {tx_type}."
@@ -10776,7 +10776,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.log.debug("Script already being watched.")
                 return
 
-        watched.append(WatchedScript(bid_id, script, tx_type, swap_type))
+        watched.append(WatchedScript(bid_id, script, tx_type, swap_type, scan_to))
 
     def removeWatchedScript(
         self, coin_type, bid_id: bytes, script: bytes, tx_type: TxTypes = None
@@ -11271,13 +11271,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 coin_type, watched_script.bid_id, watched_script.script
             )
             return True
-        bid = bid_in_progress[0]
+        bid, offer = bid_in_progress
+        b_lock_value: int = bid.amount_to
+        if offer.swap_type == SwapTypes.EVM_XMR_SWAP:
+            b_lock_value = evm_xmr_swap_1.evmAmountsForBid(self, offer, bid)[1]
 
         # Anyone can pay to the script, and later lookups only check the output adopted here
         expect_value = {
             TxTypes.PTX: bid.amount_to,
             TxTypes.XMR_SWAP_A_LOCK: bid.amount,
-            TxTypes.XMR_SWAP_B_LOCK: bid.amount_to,
+            TxTypes.XMR_SWAP_B_LOCK: b_lock_value,
         }.get(watched_script.tx_type)
         if expect_value is not None and value != expect_value:
             if (txid, vout) not in watched_script.ignored_outputs:

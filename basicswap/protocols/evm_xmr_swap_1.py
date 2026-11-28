@@ -1106,19 +1106,61 @@ def sendEvmLock(self, bid_id: bytes, cursor) -> None:
     )
 
 
-def _findXmrLock(self, offer, bid, evm_swap, cursor) -> bool:
-    """Record the XMR lock at the joint address; False if there is none."""
+def _watchXmrLock(self, ci_xmr, bid, Kbs, cursor) -> bool | None:
+    """Coins that watch scripts: processFoundScript records the lock once a scanned
+    block pays it; None until the rescan from the bid's height has passed the
+    height the watch began at."""
+    coin = ci_xmr.coin_type()
+    cc = self.coin_clients[coin]
+    watch = next(
+        (
+            ws
+            for ws in cc["watched_scripts"]
+            if ws.bid_id == bid.bid_id and ws.tx_type == TxTypes.XMR_SWAP_B_LOCK
+        ),
+        None,
+    )
+    if watch is None:
+        self.setLastHeightCheckedStart(coin, bid.chain_b_height_start, cursor)
+        self.addWatchedScript(
+            coin,
+            bid.bid_id,
+            ci_xmr.getPkDest(Kbs),
+            TxTypes.XMR_SWAP_B_LOCK,
+            scan_to=ci_xmr.getChainHeight(),
+        )
+        return None
+    if cc["last_height_checked"] < watch.scan_to:
+        return None
+    return False
+
+
+def _findXmrLock(self, offer, bid, evm_swap, cursor) -> bool | None:
+    """Record the XMR lock at the joint address; False if there is none, None while
+    the block scan watching for it is behind."""
     ci_xmr = _xmrInterface(self, offer)
     kbv, Kbs = sharedKeys(self, ci_xmr, evm_swap)
     _, xmr_pico = evmAmountsForBid(self, offer, bid)
-    found = ci_xmr.findTxB(
-        kbv,
-        Kbs,
-        xmr_pico,
-        ci_xmr.blocks_confirmed,
-        bid.chain_b_height_start or 0,
-        bid_sender=False,
-    )
+    if not ci_xmr.watch_blocks_for_scripts():
+        found = ci_xmr.findTxB(
+            kbv,
+            Kbs,
+            xmr_pico,
+            ci_xmr.blocks_confirmed,
+            bid.chain_b_height_start or 0,
+            bid_sender=False,
+        )
+    elif bid.xmr_b_lock_tx is None or bid.xmr_b_lock_tx.txid is None:
+        return _watchXmrLock(self, ci_xmr, bid, Kbs, cursor)
+    else:
+        found = ci_xmr.getLockTxHeight(
+            bid.xmr_b_lock_tx.txid,
+            ci_xmr.pkh_to_address(ci_xmr.pkh(Kbs)),
+            xmr_pico,
+            bid.chain_b_height_start,
+            find_index=True,
+            vout=bid.xmr_b_lock_tx.vout,
+        )
     changed, valid = self.recordTxB(
         ci_xmr, evm_swap, bid, found, xmr_pico, True, cursor
     )
@@ -1130,7 +1172,7 @@ def _findXmrLock(self, offer, bid, evm_swap, cursor) -> bool:
 def _xmrSideLockEnded(self, bid_id, bid, offer, evm_swap, cursor) -> None:
     """XMR side, no XMR lock recorded: the EVM side refunded."""
     # A lock sent just before a restart may not have been recorded, or mined
-    found: bool = _findXmrLock(self, offer, bid, evm_swap, cursor)
+    found: bool | None = _findXmrLock(self, offer, bid, evm_swap, cursor)
     ci_xmr = _xmrInterface(self, offer)
     if not found and ci_xmr.coin_type() in self.xmr_based_coins:
         sent = ci_xmr.findPendingBLockTx(*sharedKeys(self, ci_xmr, evm_swap))
@@ -1597,6 +1639,7 @@ def _sweepJointAddress(
         xmr_pico,
         _lockFeeRate(self, ci_xmr),
         bid.chain_b_height_start or 0,
+        lock_tx_vout=bid.getLockTXBVout(),
     )
     if published:
         self.logBidEvent(
@@ -1619,10 +1662,10 @@ def redeemXmrForEvm(self, bid_id: bytes, cursor) -> None:
     _, xmr_pico = evmAmountsForBid(self, offer, bid)
     if evm_swap.b_lock_tx_id is None:
         # Claimed past timeout1 before we saw the lock
-        ensure(
-            _findXmrLock(self, offer, bid, evm_swap, cursor),
-            f"{ci_xmr.ticker_mainnet()} lock not found",
-        )
+        found: bool | None = _findXmrLock(self, offer, bid, evm_swap, cursor)
+        if found is None:
+            raise TemporaryError(f"{ci_xmr.ticker_mainnet()} lock not scanned for yet")
+        ensure(found, f"{ci_xmr.ticker_mainnet()} lock not found")
     if not _xmrLockSpendable(
         self, offer, bid, evm_swap, ActionTypes.REDEEM_XMR_FOR_EVM, cursor
     ):
@@ -1897,7 +1940,10 @@ def _xmrCheckEvmLock(self, bid_id, bid, offer, evm_swap, cursor) -> None:
             )
         elif state_name in ("PENDING", "READY"):
             # Too late to send one, but one sent before a restart may still be mined
-            if not _findXmrLock(self, offer, bid, evm_swap, cursor):
+            found: bool | None = _findXmrLock(self, offer, bid, evm_swap, cursor)
+            if found is None:
+                return
+            if not found:
                 if _chainTime(self, evm_swap) >= evm_swap.timeout1:
                     bid.setState(BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER)
                     self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
