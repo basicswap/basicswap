@@ -1387,6 +1387,40 @@ def process_offers(args, config, script_state) -> None:
             )
             use_rate = offer_template["minrate"]
 
+        min_swap_amount = float(offer_template.get("min_swap_amount", 0))
+        if offer_amount < min_swap_amount:
+            print(
+                f"Skipping template {offer_template['name']}, balance allows {offer_amount} {coin_from_data['ticker']}, below min_swap_amount {min_swap_amount}"
+            )
+            continue
+
+        coin_from_max = float(coin_from_data["max_amount"])
+        coin_to_max = float(coin_to_data["max_amount"])
+        if offer_amount > coin_from_max or offer_amount * use_rate > coin_to_max:
+            amount_limit = coin_from_max
+            if use_rate > 0:
+                amount_limit = min(amount_limit, coin_to_max / use_rate)
+            steps = int(amount_limit / min_offer_amount)
+            if (
+                min_offer_amount * steps > coin_from_max
+                or min_offer_amount * steps * use_rate > coin_to_max
+            ):
+                steps -= 1
+            if steps <= 0:
+                print(
+                    f"Skipping template {offer_template['name']}, one amount_step exceeds the {coin_from_data['ticker']} or {coin_to_data['ticker']} maximum at rate {use_rate}"
+                )
+                continue
+            offer_amount = min_offer_amount * steps
+            print(
+                f"Reduced offer for {offer_template['name']} to {offer_amount} {coin_from_data['ticker']} to stay within the {coin_from_data['ticker']} and {coin_to_data['ticker']} maximums"
+            )
+            if min_swap_amount > offer_amount:
+                print(
+                    f"Lowering min_swap_amount for {offer_template['name']} to the reduced offer amount {offer_amount}"
+                )
+                min_swap_amount = offer_amount
+
         if args.debug:
             print(
                 "Creating offer for: {} at rate: {}".format(
@@ -1438,7 +1472,7 @@ def process_offers(args, config, script_state) -> None:
         }
 
         if "min_swap_amount" in offer_template:
-            offer_data["amt_bid_min"] = offer_template["min_swap_amount"]
+            offer_data["amt_bid_min"] = min_swap_amount
 
         offer_mode = offer_template.get("offer_mode", "standing")
         offer_data["offer_mode"] = offer_mode
