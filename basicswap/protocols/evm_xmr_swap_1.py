@@ -1878,19 +1878,27 @@ def _evmCheckMoneroLock(self, bid_id, bid, offer, evm_swap, cursor) -> None:
         return
 
     ci_xmr = _xmrInterface(self, offer)
-    found: bool = _findXmrLock(self, offer, bid, evm_swap, cursor)
-    if found:
-        lock_height = bid.xmr_b_lock_tx.chain_height
-        confirmed = lock_height > 0 and (
-            ci_xmr.getChainHeight() - lock_height >= ci_xmr.blocks_confirmed
+    try:
+        found: bool | None = _findXmrLock(self, offer, bid, evm_swap, cursor)
+        if found:
+            lock_height = bid.xmr_b_lock_tx.chain_height
+            confirmed = lock_height > 0 and (
+                ci_xmr.getChainHeight() - lock_height >= ci_xmr.blocks_confirmed
+            )
+            if confirmed:
+                self.logBidEvent(bid_id, EventLogTypes.LOCK_TX_B_CONFIRMED, "", cursor)
+                bid.setState(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
+            self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
+            self.commitDB()
+            if confirmed:
+                return
+    except Exception as e:
+        # Unknown: past timeout1 the peer can claim without a lock, so the
+        # refunds that don't depend on it must still fire
+        self.log.warning(
+            f"Looking up the {ci_xmr.ticker_mainnet()} lock for bid {self.log.id(bid_id)} failed: {e}"
         )
-        if confirmed:
-            self.logBidEvent(bid_id, EventLogTypes.LOCK_TX_B_CONFIRMED, "", cursor)
-            bid.setState(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED)
-        self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
-        self.commitDB()
-        if confirmed:
-            return
+        found = None
 
     # With no XMR lock mined, refund soon after the EVM lock, while it can't be
     # late; timeout1 - 2 margins is the fallback if this node was down
@@ -1898,7 +1906,7 @@ def _evmCheckMoneroLock(self, bid_id, bid, offer, evm_swap, cursor) -> None:
     now: int = _chainTime(self, evm_swap)
     confirmed_now: int = _confirmedChainTime(self, evm_swap)
     if _evmRefundable(evm_swap, state_name, now, confirmed_now, margin) and (
-        (not found and now >= evm_swap.xmr_lock_deadline)
+        (found is False and now >= evm_swap.xmr_lock_deadline)
         or now >= evm_swap.timeout1 - 2 * margin
         or confirmed_now >= evm_swap.timeout2
     ):
