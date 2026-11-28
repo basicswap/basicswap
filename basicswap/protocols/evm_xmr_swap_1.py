@@ -23,6 +23,8 @@ sends each one well inside it: a window's start must be past in a confirmed
 block, and its end a margin away.
 """
 
+import json
+
 from basicswap.util import ensure, TemporaryError
 from basicswap.chainparams import Coins
 from basicswap.basicswap_util import (
@@ -1135,6 +1137,20 @@ def _xmrSideLockEnded(self, bid_id, bid, offer, evm_swap, cursor) -> None:
         if sent is not None:
             self.setBidBLockTx(bid, evm_swap, sent, cursor)
             found = True
+    recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+    if recorded is not None and found:
+        self.clearStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+    elif recorded is not None:
+        # The wallet knows it only if it reached the node
+        recorded = json.loads(recorded)
+        tx = bytes.fromhex(recorded["tx"])
+        if ci_xmr.isWalletTransaction(tx):
+            self.setBidBLockTx(
+                bid, evm_swap, ci_xmr.getTxid(tx), cursor, vout=recorded["vout"]
+            )
+            found = True
+        else:
+            self.dropRecordedBLockTx(ci_xmr, bid_id, cursor)
     if found:
         self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
         _queueAction(
@@ -1228,8 +1244,10 @@ def _xmrLockBatch(self, ci_xmr, bid, evm_swap, now: int, cursor):
     return batch
 
 
-def _setXmrLockSent(self, bid, offer, evm_swap, b_lock_txid: bytes, cursor) -> None:
-    self.setBidBLockTx(bid, evm_swap, b_lock_txid, cursor)
+def _setXmrLockSent(
+    self, bid, offer, evm_swap, b_lock_txid: bytes, cursor, vout=None
+) -> None:
+    self.setBidBLockTx(bid, evm_swap, b_lock_txid, cursor, vout=vout)
     # The in-progress copy must be replaced or the leg re-queues its lock
     self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap, save_in_progress=offer)
     self.log.info(
@@ -1259,15 +1277,27 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
         self.log.debug(f"EVM lock for bid {self.log.id(bid_id)} not yet confirmed.")
         return
 
+    # Recorded before its first publish, which may have reached the node
+    recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+    if recorded is not None:
+        recorded = json.loads(recorded)
     lock_margin: int = xmrLockMinMargin(self, ci_xmr)
     lock_remaining: int = evm_swap.timeout1 - now
     send_by: int = evm_swap.xmr_lock_deadline - self.getConfirmAllowance(ci_xmr)
     b_lock_txid = None
+    b_lock_vout = None
     if lock_remaining < lock_margin or now > send_by:
         # Too late to send it, it only counts if it was sent in time
         if _findXmrLock(self, offer, bid, evm_swap, cursor):
             b_lock_txid = evm_swap.b_lock_tx_id
+        elif recorded is not None and ci_xmr.isWalletTransaction(
+            bytes.fromhex(recorded["tx"])
+        ):
+            b_lock_txid = ci_xmr.getTxid(bytes.fromhex(recorded["tx"]))
+            b_lock_vout = recorded["vout"]
         else:
+            if recorded is not None:
+                self.dropRecordedBLockTx(ci_xmr, bid_id, cursor)
             self.log.error(
                 f"Not sending {ci_xmr.ticker_mainnet()} lock for EVM bid {self.log.id(bid_id)}, too late: "
                 f"{lock_remaining}s to timeout1 (needs {lock_margin}), "
@@ -1288,8 +1318,13 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
                 return
         _, xmr_pico = evmAmountsForBid(self, offer, bid)
         kbv, Kbs = sharedKeys(self, ci_xmr, evm_swap)
+        fee_rate: int = _lockFeeRate(self, ci_xmr)
+        b_lock_tx = None
         try:
-            if batch:
+            if recorded is not None:
+                b_lock_tx = bytes.fromhex(recorded["tx"])
+                b_lock_vout = recorded["vout"]
+            elif batch:
                 locks = [(kbv, Kbs, xmr_pico)]
                 for leg in batch:
                     leg_kbv, leg_Kbs = sharedKeys(self, ci_xmr, leg.evm_swap)
@@ -1301,11 +1336,28 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
                         )
                     )
                 b_lock_txid, covered = ci_xmr.publishBLockTxs(locks, 0)
-            else:
-                result = ci_xmr.publishBLockTx(
-                    kbv, Kbs, xmr_pico, _lockFeeRate(self, ci_xmr)
+            elif (
+                funded := ci_xmr.fundBLockTx(
+                    Kbs, xmr_pico, fee_rate, bid_id=bid_id, cursor=cursor
                 )
-                b_lock_txid = result[0] if isinstance(result, tuple) else result
+            ) is not None:
+                b_lock_tx, b_lock_vout = funded
+                self.recordSignedBLockTx(b_lock_tx, b_lock_vout, [bid_id], cursor)
+            else:
+                b_lock_txid = ci_xmr.publishBLockTx(kbv, Kbs, xmr_pico, fee_rate)
+            if b_lock_tx is not None:
+                try:
+                    published = ci_xmr.publishTx(b_lock_tx)
+                except Exception as e:
+                    if not ci_xmr.isTxExistsError(str(e)):
+                        raise
+                    published = ci_xmr.getTxid(b_lock_tx).hex()
+                if published is None:
+                    # No answer isn't a refusal, the tx may be out
+                    raise TemporaryError(
+                        f"No answer publishing the {ci_xmr.ticker_mainnet()} lock for bid {self.log.id(bid_id)}."
+                    )
+                b_lock_txid = bytes.fromhex(published)
         except Exception as ex:
             self.logBidEvent(
                 bid_id, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, str(ex), cursor
@@ -1320,6 +1372,8 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
                 )
                 self.commitDB()
                 return
+            if b_lock_tx is not None:
+                self.dropRecordedBLockTx(ci_xmr, bid_id, cursor)
             raise
     for n, leg in enumerate(batch, start=1):
         if n in covered:
@@ -1333,7 +1387,7 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
             delay, ActionTypes.SEND_XMR_LOCK_FOR_EVM, bid_id, cursor
         )
         return
-    _setXmrLockSent(self, bid, offer, evm_swap, b_lock_txid, cursor)
+    _setXmrLockSent(self, bid, offer, evm_swap, b_lock_txid, cursor, vout=b_lock_vout)
 
 
 def _dripDue(evm_swap) -> bool:

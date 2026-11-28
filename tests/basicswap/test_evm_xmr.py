@@ -176,6 +176,9 @@ class FakeNode:
     def notifyBidChanged(self, bid_id):
         pass
 
+    def getStringKV(self, key, cursor=None):
+        return None
+
     def clearStringKV(self, key, cursor):
         pass
 

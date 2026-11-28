@@ -3687,20 +3687,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if offer.swap_type == SwapTypes.EVM_XMR_SWAP:
             self.swaps_in_progress[bid.bid_id] = (bid, offer)
+            self.relockRecordedBLockTx(
+                self.ci(evm_xmr_swap_1.xmrCoin(self, offer.coin_from, offer.coin_to)),
+                bid.bid_id,
+                cursor,
+            )
         elif offer.swap_type == SwapTypes.XMR_SWAP:
             xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
             self.watchXmrSwap(bid, offer, xmr_swap, cursor)
-            recorded = self.getStringKV(f"b_lock_tx:{bid.bid_id.hex()}", cursor)
-            if recorded is not None:
-                # The wallet's locks on its inputs don't outlast a daemon restart
-                try:
-                    ci_to.lockPrefundedTxInputs(
-                        bytes.fromhex(json.loads(recorded)["tx"]), bid.bid_id, cursor
-                    )
-                except Exception as e:
-                    self.log.warning(
-                        f"Locking the inputs of the recorded coin B lock tx for bid {self.log.id(bid.bid_id)} failed: {e}"
-                    )
+            self.relockRecordedBLockTx(ci_to, bid.bid_id, cursor)
             if (
                 ci_to.watch_blocks_for_scripts()
                 and bid.xmr_a_lock_tx
@@ -14137,6 +14132,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if leg_remaining is not None and leg_remaining < lock_margin:
                 return True
         return False
+
+    def relockRecordedBLockTx(self, ci_to, bid_id: bytes, cursor) -> None:
+        recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+        if recorded is None:
+            return
+        # The wallet's locks on its inputs don't outlast a daemon restart
+        try:
+            ci_to.lockPrefundedTxInputs(
+                bytes.fromhex(json.loads(recorded)["tx"]), bid_id, cursor
+            )
+        except Exception as e:
+            self.log.warning(
+                f"Locking the inputs of the recorded coin B lock tx for bid {self.log.id(bid_id)} failed: {e}"
+            )
 
     def dropRecordedBLockTx(self, ci_to, bid_id: bytes, cursor) -> None:
         recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
