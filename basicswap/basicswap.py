@@ -4491,25 +4491,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     extra_options["from_fee_override"]
                 )
             else:
-                # TODO: conf_target = ci_from.settings.get('conf_target', 2)
-                conf_target = 2
-                if "from_fee_conf_target" in extra_options:
-                    conf_target = extra_options["from_fee_conf_target"]
-                fee_rate, fee_src = self.getFeeRateForCoin(coin_from, conf_target)
-                if "from_fee_multiplier_percent" in extra_options:
-                    fee_rate *= extra_options["fee_multiplier"] / 100.0
+                conf_target, extra_percent = self.getOfferFeeDefaults(coin_from)
+                fee_rate, fee_src = self.getOfferFeeRate(
+                    coin_from,
+                    extra_options.get("from_fee_conf_target", conf_target),
+                    extra_options.get("from_fee_multiplier_percent", extra_percent),
+                )
                 msg_buf.fee_rate_from = ci_from.make_int(fee_rate)
 
             if "to_fee_override" in extra_options:
                 msg_buf.fee_rate_to = ci_to.make_int(extra_options["to_fee_override"])
             else:
-                # TODO: conf_target = ci_to.settings.get('conf_target', 2)
-                conf_target = 2
-                if "to_fee_conf_target" in extra_options:
-                    conf_target = extra_options["to_fee_conf_target"]
-                fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target)
-                if "to_fee_multiplier_percent" in extra_options:
-                    fee_rate *= extra_options["fee_multiplier"] / 100.0
+                conf_target, extra_percent = self.getOfferFeeDefaults(coin_to)
+                fee_rate, fee_src = self.getOfferFeeRate(
+                    coin_to,
+                    extra_options.get("to_fee_conf_target", conf_target),
+                    extra_options.get("to_fee_multiplier_percent", extra_percent),
+                )
                 msg_buf.fee_rate_to = ci_to.make_int(fee_rate)
 
             if swap_type == SwapTypes.XMR_SWAP:
@@ -5209,6 +5207,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def getFeeRateForCoin(self, coin_type, conf_target: int = 2):
         return self.ci(coin_type).get_fee_rate(conf_target)
+
+    def getOfferFeeDefaults(self, coin_type) -> tuple[int, int]:
+        """(conf_target, extra_percent) an offer's fee rate for coin_type uses
+        unless the offer sets its own."""
+        if coin_type in self.xmr_based_coins:
+            return 2, 0
+        return (
+            self.ci(coin_type).getConfTarget(),
+            self.getChainClientSettings(coin_type).get("fee_extra_percent", 0),
+        )
+
+    def getOfferFeeRate(self, coin_type, conf_target: int, extra_percent: int):
+        fee_rate, fee_src = self.getFeeRateForCoin(coin_type, conf_target)
+        return fee_rate * (1.0 + extra_percent / 100.0), fee_src
 
     def estimateWithdrawFee(self, coin_type, fee_rate):
         if coin_type in self.xmr_based_coins:
@@ -17123,6 +17135,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             if self.isCoinActive(coin):
                                 self.ci(coin).setConfTarget(new_conf_target)
                             break
+
+            if "fee_extra_percent" in data:
+                new_fee_extra_percent = data["fee_extra_percent"]
+                ensure(
+                    new_fee_extra_percent >= 0 and new_fee_extra_percent <= 100,
+                    "Invalid fee_extra_percent",
+                )
+                if settings_cc.get("fee_extra_percent", 0) != new_fee_extra_percent:
+                    settings_changed = True
+                    settings_cc["fee_extra_percent"] = new_fee_extra_percent
 
             if "anon_tx_ring_size" in data:
                 new_anon_tx_ring_size = data["anon_tx_ring_size"]

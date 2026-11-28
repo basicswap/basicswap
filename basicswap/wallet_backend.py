@@ -48,7 +48,7 @@ class WalletBackend(ABC):
         pass
 
     @abstractmethod
-    def estimateFee(self, blocks: int = 6) -> int:
+    def estimateFee(self, blocks: int = 6) -> float:
         pass
 
     @abstractmethod
@@ -123,14 +123,11 @@ class FullNodeBackend(WalletBackend):
     def getBlockHeight(self) -> int:
         return self._rpc("getblockcount")
 
-    def estimateFee(self, blocks: int = 6) -> int:
-        try:
-            result = self._rpc("estimatesmartfee", [blocks])
-            if "feerate" in result:
-                return int(result["feerate"] * 1e8 / 1000)
-            return 1
-        except Exception:
-            return 1
+    def estimateFee(self, blocks: int = 6) -> float:
+        result = self._rpc("estimatesmartfee", [blocks])
+        if "feerate" not in result:
+            raise ValueError(f"No fee estimate for {blocks} blocks")
+        return result["feerate"]
 
     def isConnected(self) -> bool:
         try:
@@ -602,23 +599,21 @@ class ElectrumBackend(WalletBackend):
         except Exception:
             return self._cached_height if self._cached_height > 0 else 0
 
-    def estimateFee(self, blocks: int = 6) -> int:
+    def estimateFee(self, blocks: int = 6) -> float:
         now = time.time()
-        cache_key = blocks
-        if cache_key in self._cached_fee:
-            if (now - self._cached_fee_time.get(cache_key, 0)) < self._fee_cache_ttl:
-                return self._cached_fee[cache_key]
+        if (now - self._cached_fee_time.get(blocks, 0)) < self._fee_cache_ttl:
+            return self._cached_fee[blocks]
 
-        try:
-            fee = self._call("blockchain.estimatefee", [blocks])
-            if fee and fee > 0:
-                result = int(fee * 1e8 / 1000)
-                self._cached_fee[cache_key] = result
-                self._cached_fee_time[cache_key] = now
-                return result
-            return self._cached_fee.get(cache_key, 1)
-        except Exception:
-            return self._cached_fee.get(cache_key, 1)
+        fee = self._call("blockchain.estimatefee", [blocks])
+        if not fee or fee <= 0:
+            # Secret-hash redeems fetch the rate when sent; a queued action retries a
+            # TemporaryError, any other error fails the bid
+            if blocks in self._cached_fee:
+                return self._cached_fee[blocks]
+            raise TemporaryError(f"No fee estimate for {blocks} blocks")
+        self._cached_fee[blocks] = fee
+        self._cached_fee_time[blocks] = now
+        return fee
 
     def isConnected(self) -> bool:
         try:

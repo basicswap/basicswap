@@ -430,6 +430,10 @@
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Blocks Confirmed Target</label>
             <input type="number" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="conf_target_{{ c.name }}" min="1" max="32" value="{{ c.conf_target }}" placeholder="6">
            </div>
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Offer Fee Rate Increase (%)</label>
+            <input type="number" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="fee_extra_percent_{{ c.name }}" min="0" max="100" value="{{ c.fee_extra_percent }}" placeholder="0">
+           </div>
            {% endif %}
 
             {% if c.name == 'particl' %}

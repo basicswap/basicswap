@@ -1546,10 +1546,6 @@ class ElectrumServer:
     def get_transaction(self, txid, verbose=False):
         return self.call("blockchain.transaction.get", [txid, verbose])
 
-    def estimate_fee(self, num_blocks):
-        result = self.call("blockchain.estimatefee", [num_blocks])
-        return result
-
     def get_merkle(self, txid, height):
         return self.call("blockchain.transaction.get_merkle", [txid, height])
 

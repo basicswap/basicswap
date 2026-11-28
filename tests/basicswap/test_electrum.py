@@ -140,6 +140,9 @@ def modify_config(cls, test_path, i):
     )
     for coin_settings in settings["chainclients"].values():
         coin_settings["electrum_poll_interval"] = 5
+        if coin_settings.get("connection_type") == "electrum":
+            # A fresh regtest chain has no fee estimate
+            coin_settings["override_feerate"] = 0.00001
     with open(config_path, "w") as fp:
         json.dump(settings, fp, indent=4)
 

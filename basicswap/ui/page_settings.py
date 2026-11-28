@@ -339,6 +339,9 @@ def page_settings(self, url_split, post_string):
                         data["conf_target"] = int(
                             get_data_entry(form_data, "conf_target_" + name)
                         )
+                        data["fee_extra_percent"] = int(
+                            get_data_entry_or(form_data, "fee_extra_percent_" + name, 0)
+                        )
                         if name == "particl":
                             data["anon_tx_ring_size"] = int(
                                 get_data_entry(form_data, "rct_ring_size_" + name)
@@ -539,6 +542,7 @@ def page_settings(self, url_split, post_string):
             )
         else:
             chains_formatted[-1]["conf_target"] = c.get("conf_target", 2)
+            chains_formatted[-1]["fee_extra_percent"] = c.get("fee_extra_percent", 0)
 
         try:
             chains_formatted[-1]["altruistic"] = swap_client.ci(

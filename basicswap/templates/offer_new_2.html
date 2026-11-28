@@ -111,6 +111,7 @@
                 <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
                 <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
                 <option value="100" {% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
+                {% if data.fee_from_extra not in (0, 10, 50, 100) %}<option value="{{ data.fee_from_extra }}" selected>{{ data.fee_from_extra }}%</option>{% endif %}
               </select>
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Optional extra fee bump applied on top of the estimate to help confirm faster when the network is busy.</p>
@@ -135,6 +136,7 @@
                 <option value="10" {% if data.fee_to_extra==10 %} selected{% endif %}>10%</option>
                 <option value="50" {% if data.fee_to_extra==50 %} selected{% endif %}>50%</option>
                 <option value="100" {% if data.fee_to_extra==100 %} selected{% endif %}>100%</option>
+                {% if data.fee_to_extra not in (0, 10, 50, 100) %}<option value="{{ data.fee_to_extra }}" selected>{{ data.fee_to_extra }}%</option>{% endif %}
               </select>
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Optional extra fee bump applied on top of the estimate to help confirm faster when the network is busy.</p>
