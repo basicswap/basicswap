@@ -29,6 +29,7 @@ from basicswap.basicswap_util import (
     ActionTypes,
     AddressTypes,
     BidStates,
+    DebugTypes,
     canAcceptBidState,
     EventLogTypes,
     getLastBidState,
@@ -51,6 +52,7 @@ from basicswap.messages_npb import (
     EvmXmrBidAcceptMessage,
     EvmXmrLockMessage,
 )
+from basicswap.interface.base import Curves
 from basicswap.interface.evm import keys as evmkeys
 from basicswap.interface.evm.swapfactory import SwapFactory
 from basicswap.interface.evm.rpc import EthRpcError, ReceiptTimeout
@@ -83,6 +85,36 @@ def evmAmountsForBid(self, offer, bid):
 
 def evmCoin(self, coin_from, coin_to):
     return coin_from if Coins(coin_from) in self.evm_contract_coins else coin_to
+
+
+def xmrCoin(self, coin_from, coin_to):
+    return coin_to if Coins(coin_from) in self.evm_contract_coins else coin_from
+
+
+def _xmrInterface(self, offer):
+    return self.ci(xmrCoin(self, offer.coin_from, offer.coin_to))
+
+
+def _lockFeeRate(self, ci_xmr) -> int:
+    # Monero's wallet picks its own fee
+    if ci_xmr.coin_type() in self.xmr_based_coins:
+        return 0
+    fee_rate, _ = ci_xmr.get_fee_rate(ci_xmr._conf_target)
+    return ci_xmr.make_int(fee_rate)
+
+
+def _debugTweak(self, bid, cursor) -> None:
+    if self.countBidEvents(bid, EventLogTypes.DEBUG_TWEAK_APPLIED, cursor) < 1:
+        self.logBidEvent(
+            bid.bid_id,
+            EventLogTypes.DEBUG_TWEAK_APPLIED,
+            f"ind {bid.debug_ind}",
+            cursor,
+        )
+
+
+def _keyProofMessage(evm_side: bool) -> str:
+    return "proof kbsl owned for swap" if evm_side else "proof kbsf owned for swap"
 
 
 def _contract(self, evm_swap):
@@ -128,9 +160,12 @@ def _sides(we_are_evm: bool):
     return ("evm", "xmr") if we_are_evm else ("xmr", "evm")
 
 
-def _setOwnKeys(self, evm_swap, created_at: int, we_are_evm: bool, cursor) -> bytes:
-    """Derive our halves from the seed; returns the spend half's DLEAG."""
-    ci_xmr = self.ci(Coins.XMR)
+def _setOwnKeys(
+    self, ci_xmr, evm_swap, created_at: int, we_are_evm: bool, offer_id: bytes, cursor
+) -> bytes:
+    """Derive our halves from the seed; returns the spend half's DLEAG, or its key
+    proof where coin B is secp256k1."""
+    for_ed25519: bool = ci_xmr.curve_type() == Curves.ed25519
     evm_swap.contract_count = self.getNewContractId(cursor)
     view_type, spend_type = (
         (KeyTypes.KBVL, KeyTypes.KBSL) if we_are_evm else (KeyTypes.KBVF, KeyTypes.KBSF)
@@ -139,22 +174,27 @@ def _setOwnKeys(self, evm_swap, created_at: int, we_are_evm: bool, cursor) -> by
     def pathKey(key_type) -> bytes:
         return self.getPathKey(
             evm_swap.evm_coin,
-            Coins.XMR,
+            ci_xmr.interface_type(),
             created_at,
             evm_swap.contract_count,
             key_type,
-            for_ed25519=True,
+            for_ed25519=for_ed25519,
         )
 
     kbv: bytes = pathKey(view_type)
     kbs: bytes = pathKey(spend_type)
-    dleag: bytes = ci_xmr.proveDLEAG(kbs)
+    if for_ed25519:
+        proof: bytes = ci_xmr.proveDLEAG(kbs)
+        pkas: bytes = proof[0:33]
+    else:
+        proof = ci_xmr.signKeyProof(kbs, _keyProofMessage(we_are_evm), offer_id)
+        pkas = ci_xmr.getPubkey(kbs)
     ours, _ = _sides(we_are_evm)
     setattr(evm_swap, f"{ours}_kbv", kbv)
     setattr(evm_swap, f"{ours}_kbs", kbs)
     setattr(evm_swap, f"{ours}_pkbs", ci_xmr.getPubkey(kbs))
-    setattr(evm_swap, f"{ours}_pkas", dleag[0:33])
-    return dleag
+    setattr(evm_swap, f"{ours}_pkas", pkas)
+    return proof
 
 
 def _storePeerMessage(self, evm_swap, msg_data, peer_is_evm: bool) -> None:
@@ -188,30 +228,34 @@ def _gasRequest(self, evm_coin) -> int:
 
 
 def _assemblePeerDleag(
-    self, cursor, bid, evm_swap, msg_type, addr_from, addr_to
+    self, ci_xmr, cursor, bid, evm_swap, msg_type, addr_from, addr_to
 ) -> None:
-    if len(evm_swap.peer_dleag) < self.ci(Coins.XMR).lengthDLEAG():
+    if ci_xmr.curve_type() != Curves.ed25519:
+        return
+    if len(evm_swap.peer_dleag) < ci_xmr.lengthDLEAG():
         evm_swap.peer_dleag += self.splitDleag(
             cursor, bid.bid_id, msg_type, addr_from, addr_to, evm_swap
         )
 
 
-def _checkPeerKeys(self, evm_swap, peer_is_evm: bool) -> None:
-    ci_xmr = self.ci(Coins.XMR)
+def _checkPeerKeys(self, ci_xmr, evm_swap, peer_is_evm: bool, offer_id: bytes) -> None:
     peer, _ = _sides(peer_is_evm)
     ensure(ci_xmr.verifyKey(getattr(evm_swap, f"{peer}_kbv")), "Invalid peer view key")
-    dleag: bytes = evm_swap.peer_dleag
-    ensure(ci_xmr.verifyDLEAG(dleag), "Invalid DLEAG proof")
-    pkas: bytes = dleag[0:33]
-    pkbs: bytes = dleag[33 : 33 + 32]
+    proof: bytes = evm_swap.peer_dleag
+    if ci_xmr.curve_type() == Curves.ed25519:
+        ensure(ci_xmr.verifyDLEAG(proof), "Invalid DLEAG proof")
+        pkas: bytes = proof[0:33]
+        pkbs: bytes = proof[33 : 33 + 32]
+    else:
+        pkbs = ci_xmr.verifyKeyProof(proof, _keyProofMessage(peer_is_evm), offer_id)
+        pkas = pkbs
     evmkeys.commitment(pkas)
     ensure(ci_xmr.verifyPubkey(pkbs), "Invalid peer spend pubkey")
     setattr(evm_swap, f"{peer}_pkas", pkas)
     setattr(evm_swap, f"{peer}_pkbs", pkbs)
 
 
-def _checkDistinctKeys(self, evm_swap) -> None:
-    ci_xmr = self.ci(Coins.XMR)
+def _checkDistinctKeys(self, ci_xmr, evm_swap) -> None:
     ensure(evm_swap.evm_pkbs != evm_swap.xmr_pkbs, "Duplicate spend pubkey")
     ensure(
         ci_xmr.getPubkey(evm_swap.evm_kbv) != ci_xmr.getPubkey(evm_swap.xmr_kbv),
@@ -219,17 +263,15 @@ def _checkDistinctKeys(self, evm_swap) -> None:
     )
 
 
-def sharedKeys(self, evm_swap):
+def sharedKeys(self, ci_xmr, evm_swap):
     """(joint private view key, joint public spend key)"""
-    ci_xmr = self.ci(Coins.XMR)
     return (
         ci_xmr.sumKeys(evm_swap.evm_kbv, evm_swap.xmr_kbv),
         ci_xmr.sumPubkeys(evm_swap.evm_pkbs, evm_swap.xmr_pkbs),
     )
 
 
-def _revealedKey(self, revealed: bytes, expect_pkbs: bytes) -> bytes:
-    ci_xmr = self.ci(Coins.XMR)
+def _revealedKey(self, ci_xmr, revealed: bytes, expect_pkbs: bytes) -> bytes:
     ensure(ci_xmr.getPubkey(revealed) == expect_pkbs, "Revealed key mismatch")
     return revealed
 
@@ -332,10 +374,10 @@ def ensureEvmFunds(self, evm_coin, amount: int, exclude_bid: bytes = None) -> No
     )
 
 
-def xmrLockMinMargin(self) -> int:
+def xmrLockMinMargin(self, ci_xmr) -> int:
     """Least time left before timeout1 to send the XMR lock with: the EVM side
     refunds once two release margins are left without a confirmed lock."""
-    return self.getBLockMinMargin(self.ci(Coins.XMR)) + self._sc_lock_release_min_margin
+    return self.getBLockMinMargin(ci_xmr) + self._sc_lock_release_min_margin
 
 
 def _confirmedHeight(self, evm_swap) -> int:
@@ -410,9 +452,8 @@ def _anyBlocked(self, ci_evm, addresses) -> bool:
     return False
 
 
-def _xmrRestoreHeight(self, cursor=None) -> int:
+def _xmrRestoreHeight(self, ci_xmr, cursor=None) -> int:
     """The joint watch wallet scans from here: the XMR lock comes after the bid."""
-    ci_xmr = self.ci(Coins.XMR)
     return max(ci_xmr.getChainHeight(), self.getWalletRestoreHeight(ci_xmr, cursor))
 
 
@@ -487,8 +528,11 @@ def postEvmXmrBid(
         )
         ensureContractUnblocked(ci_evm, evm_swap.contract_address)
         self.setMsgSplitInfo(evm_swap)
-        bid.chain_b_height_start = _xmrRestoreHeight(self, cursor)
-        dleag: bytes = _setOwnKeys(self, evm_swap, bid_created_at, we_are_evm, cursor)
+        ci_xmr = _xmrInterface(self, offer)
+        bid.chain_b_height_start = _xmrRestoreHeight(self, ci_xmr, cursor)
+        dleag: bytes = _setOwnKeys(
+            self, ci_xmr, evm_swap, bid_created_at, we_are_evm, offer.offer_id, cursor
+        )
         my_addr: str = ci_evm.getNewAddress()
         if we_are_evm:
             evm_swap.evm_addr = my_addr
@@ -599,7 +643,7 @@ def processEvmXmrBid(self, msg) -> None:
         contract_address=self.ci(evm_coin).getContractAddress(),
     )
     self.setMsgSplitInfo(evm_swap)
-    bid.chain_b_height_start = _xmrRestoreHeight(self)
+    bid.chain_b_height_start = _xmrRestoreHeight(self, _xmrInterface(self, offer))
     _storePeerMessage(self, evm_swap, bid_data, not weAreEvmSide(self, offer, bid))
 
     bid.setState(BidStates.BID_RECEIVING)
@@ -617,6 +661,8 @@ def processEvmXmrBid(self, msg) -> None:
             networkTypeToID(msg.get("type", "smsg")),
             cursor,
         )
+        if _xmrInterface(self, offer).curve_type() != Curves.ed25519:
+            receiveEvmXmrBid(self, bid, cursor)
     finally:
         self.closeDB(cursor)
 
@@ -629,10 +675,18 @@ def receiveEvmXmrBid(self, bid, cursor) -> None:
     ensure(evm_swap, f"EVM<->XMR swap not found: {self.log.id(bid.bid_id)}.")
     peer_is_evm: bool = not weAreEvmSide(self, offer, bid)
 
+    ci_xmr = _xmrInterface(self, offer)
     _assemblePeerDleag(
-        self, cursor, bid, evm_swap, XmrSplitMsgTypes.BID, bid.bid_addr, offer.addr_from
+        self,
+        ci_xmr,
+        cursor,
+        bid,
+        evm_swap,
+        XmrSplitMsgTypes.BID,
+        bid.bid_addr,
+        offer.addr_from,
     )
-    _checkPeerKeys(self, evm_swap, peer_is_evm)
+    _checkPeerKeys(self, ci_xmr, evm_swap, peer_is_evm, offer.offer_id)
 
     bid.setState(BidStates.BID_RECEIVED)
     self.log.info(f"Received EVM<->XMR bid {self.log.id(bid.bid_id)}.")
@@ -684,10 +738,17 @@ def acceptEvmXmrBid(self, bid_id: bytes, cursor=None) -> None:
             ensureEvmFunds(
                 self, evm_swap.evm_coin, evmAmountsForBid(self, offer, bid)[0], bid_id
             )
+        ci_xmr = _xmrInterface(self, offer)
         dleag: bytes = _setOwnKeys(
-            self, evm_swap, bid.created_at, we_are_evm, use_cursor
+            self,
+            ci_xmr,
+            evm_swap,
+            bid.created_at,
+            we_are_evm,
+            offer.offer_id,
+            use_cursor,
         )
-        _checkDistinctKeys(self, evm_swap)
+        _checkDistinctKeys(self, ci_xmr, evm_swap)
         my_addr: str = self.ci(evm_swap.evm_coin).getNewAddress()
         if we_are_evm:
             evm_swap.evm_addr = my_addr
@@ -778,6 +839,8 @@ def processEvmXmrBidAccept(self, msg) -> None:
         bid.setState(BidStates.BID_RECEIVING_ACC)
         self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
         self.log.info(f"Receiving EVM_XMR_BID_ACCEPT_LF {self.log.id(bid_id)}")
+        if _xmrInterface(self, offer).curve_type() != Curves.ed25519:
+            receiveEvmXmrBidAccept(self, bid, cursor)
     finally:
         self.closeDB(cursor)
 
@@ -790,8 +853,10 @@ def receiveEvmXmrBidAccept(self, bid, cursor) -> None:
     ensure(evm_swap, f"EVM<->XMR swap not found: {self.log.id(bid.bid_id)}.")
     peer_is_evm: bool = not weAreEvmSide(self, offer, bid)
 
+    ci_xmr = _xmrInterface(self, offer)
     _assemblePeerDleag(
         self,
+        ci_xmr,
         cursor,
         bid,
         evm_swap,
@@ -799,8 +864,8 @@ def receiveEvmXmrBidAccept(self, bid, cursor) -> None:
         offer.addr_from,
         bid.bid_addr,
     )
-    _checkPeerKeys(self, evm_swap, peer_is_evm)
-    _checkDistinctKeys(self, evm_swap)
+    _checkPeerKeys(self, ci_xmr, evm_swap, peer_is_evm, offer.offer_id)
+    _checkDistinctKeys(self, ci_xmr, evm_swap)
 
     if evm_swap.evm_lock_tx_id is None:
         bid.setState(BidStates.BID_ACCEPTED)
@@ -863,13 +928,13 @@ def processEvmXmrLock(self, msg) -> None:
 # --- queued action helpers ---------------------------------------------------
 
 
-def _fixTimeouts(self, evm_swap, duration: int, now: int) -> None:
+def _fixTimeouts(self, ci_xmr, evm_swap, duration: int, now: int) -> None:
     evm_swap.timeout1 = now + duration
     evm_swap.timeout2 = evm_swap.timeout1 + duration
     evm_swap.timeout3 = evm_swap.timeout2 + duration
     # A lock mined at the deadline leaves the EVM side two margins to refund in
     evm_swap.xmr_lock_deadline = min(
-        now + self._evm_xmr_lock_wait,
+        now + self._evm_xmr_lock_wait + self.getConfirmAllowance(ci_xmr),
         evm_swap.timeout1 - 2 * self._sc_lock_release_min_margin,
     )
 
@@ -915,7 +980,13 @@ def sendEvmLock(self, bid_id: bytes, cursor) -> None:
     # The swap address hashes the timeouts, so they're fixed before signing
     per_swap: bool = isinstance(contract, SwapFactory)
     if per_swap and evm_swap.timeout1 is None:
-        _fixTimeouts(self, evm_swap, duration, ci_evm.rpc.get_block_time())
+        _fixTimeouts(
+            self,
+            _xmrInterface(self, offer),
+            evm_swap,
+            duration,
+            ci_evm.rpc.get_block_time(),
+        )
         self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
         self.commitDB()
 
@@ -985,7 +1056,9 @@ def sendEvmLock(self, bid_id: bytes, cursor) -> None:
     if not per_swap:
         _, t1, _, _ = contract.new_swap_event(receipt)
         # newSwap sets timeout1 to its block time plus the first duration
-        _fixTimeouts(self, evm_swap, duration, t1 - duration)
+        _fixTimeouts(
+            self, _xmrInterface(self, offer), evm_swap, duration, t1 - duration
+        )
     swap: tuple = _swap(self, offer, bid, evm_swap)
     sid: bytes = contract.swap_id(swap)
     ensure(contract.lock_swap_id(receipt) == sid, "Swap id mismatch")
@@ -1033,8 +1106,8 @@ def sendEvmLock(self, bid_id: bytes, cursor) -> None:
 
 def _findXmrLock(self, offer, bid, evm_swap, cursor) -> bool:
     """Record the XMR lock at the joint address; False if there is none."""
-    ci_xmr = self.ci(Coins.XMR)
-    kbv, Kbs = sharedKeys(self, evm_swap)
+    ci_xmr = _xmrInterface(self, offer)
+    kbv, Kbs = sharedKeys(self, ci_xmr, evm_swap)
     _, xmr_pico = evmAmountsForBid(self, offer, bid)
     found = ci_xmr.findTxB(
         kbv,
@@ -1056,8 +1129,9 @@ def _xmrSideLockEnded(self, bid_id, bid, offer, evm_swap, cursor) -> None:
     """XMR side, no XMR lock recorded: the EVM side refunded."""
     # A lock sent just before a restart may not have been recorded, or mined
     found: bool = _findXmrLock(self, offer, bid, evm_swap, cursor)
-    if not found:
-        sent = self.ci(Coins.XMR).findPendingBLockTx(*sharedKeys(self, evm_swap))
+    ci_xmr = _xmrInterface(self, offer)
+    if not found and ci_xmr.coin_type() in self.xmr_based_coins:
+        sent = ci_xmr.findPendingBLockTx(*sharedKeys(self, ci_xmr, evm_swap))
         if sent is not None:
             self.setBidBLockTx(bid, evm_swap, sent, cursor)
             found = True
@@ -1067,36 +1141,36 @@ def _xmrSideLockEnded(self, bid_id, bid, offer, evm_swap, cursor) -> None:
             self,
             bid_id,
             ActionTypes.RECOVER_XMR_FROM_EVM_REFUND,
-            "Recovering unrecorded XMR lock after EVM refund",
+            f"Recovering unrecorded {ci_xmr.ticker_mainnet()} lock after EVM refund",
             cursor,
         )
         return
     self.log.info(
-        f"EVM lock refunded before XMR lock for bid {self.log.id(bid_id)}; abandoning."
+        f"EVM lock refunded before {ci_xmr.ticker_mainnet()} lock for bid {self.log.id(bid_id)}; abandoning."
     )
     bid.setState(BidStates.XMR_SWAP_FAILED_REFUNDED)
     self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
     self.commitDB()
 
 
-def xmrLockRemaining(self, evm_swap):
+def xmrLockRemaining(self, ci_xmr, evm_swap):
     """Seconds left to send the XMR lock before the EVM side's lock deadline."""
     if not evm_swap.xmr_lock_deadline:
         return None
     return (
         evm_swap.xmr_lock_deadline
-        - self.getConfirmAllowance(self.ci(Coins.XMR))
+        - self.getConfirmAllowance(ci_xmr)
         - _chainTime(self, evm_swap)
     )
 
 
-def _xmrLockBatch(self, bid, evm_swap, now: int, cursor):
+def _xmrLockBatch(self, ci_xmr, bid, evm_swap, now: int, cursor):
     """Plan siblings to lock with bid in one XMR tx, or None to hold the lock."""
     ready_timeout: int = self.getPlanReadyTimeout(bid.plan_id, cursor)
     plan = multibid.plan_batch_decision(
         self.getPlanLegs(bid.plan_id, cursor),
         bid.bid_id,
-        cap=self.ci(Coins.XMR).max_batched_lock_outputs(),
+        cap=ci_xmr.max_batched_lock_outputs(),
         now=now,
         ready_timeout=ready_timeout,
         confirm_timeout=self.getPlanConfirmTimeout(
@@ -1110,7 +1184,7 @@ def _xmrLockBatch(self, bid, evm_swap, now: int, cursor):
         self.deactivateBidForReason(leg.bid_id, BidStates.BID_ABANDONED, cursor=cursor)
     if plan.wait:
         self.log.info(
-            f"Holding the XMR lock for bid {self.log.id(bid.bid_id)}, the rest of its plan is not locked yet."
+            f"Holding the {ci_xmr.ticker_mainnet()} lock for bid {self.log.id(bid.bid_id)}, the rest of its plan is not locked yet."
         )
         self.createActionInSession(
             self.get_delay_event_seconds(),
@@ -1131,12 +1205,12 @@ def _xmrLockBatch(self, bid, evm_swap, now: int, cursor):
                 raise
             # One counterparty's bad or unseen lock mustn't stop the others
             self.log.warning(
-                f"Leaving plan leg {self.log.id(leg.bid_id)} out of the XMR lock: {e}"
+                f"Leaving plan leg {self.log.id(leg.bid_id)} out of the {ci_xmr.ticker_mainnet()} lock: {e}"
             )
             continue
         if not valid:
             continue
-        if leg.evm_swap.timeout1 - now < xmrLockMinMargin(self) or (
+        if leg.evm_swap.timeout1 - now < xmrLockMinMargin(self, ci_xmr) or (
             leg.lock_remaining_seconds is not None and leg.lock_remaining_seconds < 0
         ):
             continue
@@ -1158,7 +1232,9 @@ def _setXmrLockSent(self, bid, offer, evm_swap, b_lock_txid: bytes, cursor) -> N
     self.setBidBLockTx(bid, evm_swap, b_lock_txid, cursor)
     # The in-progress copy must be replaced or the leg re-queues its lock
     self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap, save_in_progress=offer)
-    self.log.info(f"Published XMR lock for EVM bid {self.log.id(bid.bid_id)}")
+    self.log.info(
+        f"Published {_xmrInterface(self, offer).ticker_mainnet()} lock for EVM bid {self.log.id(bid.bid_id)}"
+    )
 
 
 def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
@@ -1170,7 +1246,7 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
         return
     offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
     ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
-    ci_xmr = self.ci(Coins.XMR)
+    ci_xmr = _xmrInterface(self, offer)
 
     swap, state_name, _ = _evmLock(self, offer, bid, evm_swap)
     if state_name == "REFUNDED":
@@ -1183,7 +1259,7 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
         self.log.debug(f"EVM lock for bid {self.log.id(bid_id)} not yet confirmed.")
         return
 
-    lock_margin: int = xmrLockMinMargin(self)
+    lock_margin: int = xmrLockMinMargin(self, ci_xmr)
     lock_remaining: int = evm_swap.timeout1 - now
     send_by: int = evm_swap.xmr_lock_deadline - self.getConfirmAllowance(ci_xmr)
     b_lock_txid = None
@@ -1193,7 +1269,7 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
             b_lock_txid = evm_swap.b_lock_tx_id
         else:
             self.log.error(
-                f"Not sending XMR lock for EVM bid {self.log.id(bid_id)}, too late: "
+                f"Not sending {ci_xmr.ticker_mainnet()} lock for EVM bid {self.log.id(bid_id)}, too late: "
                 f"{lock_remaining}s to timeout1 (needs {lock_margin}), "
                 f"{send_by - now}s to the EVM side's lock deadline."
             )
@@ -1206,17 +1282,17 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
     batch = []
     covered = [0]
     if b_lock_txid is None:
-        if bid.plan_id:
-            batch = _xmrLockBatch(self, bid, evm_swap, now, cursor)
+        if bid.plan_id and ci_xmr.coin_type() in self.xmr_based_coins:
+            batch = _xmrLockBatch(self, ci_xmr, bid, evm_swap, now, cursor)
             if batch is None:
                 return
         _, xmr_pico = evmAmountsForBid(self, offer, bid)
-        kbv, Kbs = sharedKeys(self, evm_swap)
+        kbv, Kbs = sharedKeys(self, ci_xmr, evm_swap)
         try:
             if batch:
                 locks = [(kbv, Kbs, xmr_pico)]
                 for leg in batch:
-                    leg_kbv, leg_Kbs = sharedKeys(self, leg.evm_swap)
+                    leg_kbv, leg_Kbs = sharedKeys(self, ci_xmr, leg.evm_swap)
                     locks.append(
                         (
                             leg_kbv,
@@ -1226,7 +1302,10 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
                     )
                 b_lock_txid, covered = ci_xmr.publishBLockTxs(locks, 0)
             else:
-                b_lock_txid = ci_xmr.publishBLockTx(kbv, Kbs, xmr_pico, 0)
+                result = ci_xmr.publishBLockTx(
+                    kbv, Kbs, xmr_pico, _lockFeeRate(self, ci_xmr)
+                )
+                b_lock_txid = result[0] if isinstance(result, tuple) else result
         except Exception as ex:
             self.logBidEvent(
                 bid_id, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, str(ex), cursor
@@ -1234,7 +1313,7 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
             if ci_xmr.is_transient_error(ex) or self.is_transient_error(ex):
                 delay = self.get_delay_retry_seconds()
                 self.log.info(
-                    f"Retrying XMR lock for bid {self.log.id(bid_id)} in {delay} seconds: {ex}"
+                    f"Retrying {ci_xmr.ticker_mainnet()} lock for bid {self.log.id(bid_id)} in {delay} seconds: {ex}"
                 )
                 self.createActionInSession(
                     delay, ActionTypes.SEND_XMR_LOCK_FOR_EVM, bid_id, cursor
@@ -1248,7 +1327,7 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
     if 0 not in covered:
         delay = self.get_delay_retry_seconds()
         self.log.info(
-            f"Retrying the XMR lock for bid {self.log.id(bid_id)} in {delay} seconds, tx {self.log.id(b_lock_txid)} does not pay it."
+            f"Retrying the {ci_xmr.ticker_mainnet()} lock for bid {self.log.id(bid_id)} in {delay} seconds, tx {self.log.id(b_lock_txid)} does not pay it."
         )
         self.createActionInSession(
             delay, ActionTypes.SEND_XMR_LOCK_FOR_EVM, bid_id, cursor
@@ -1307,7 +1386,9 @@ def markEvmReady(self, bid_id: bytes, cursor) -> None:
     ensure(bid and evm_swap, f"Bid not found: {self.log.id(bid_id)}.")
     offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
     swap, state_name, _ = _evmLock(self, offer, bid, evm_swap)
-    if state_name == "PENDING":
+    if state_name == "PENDING" and bid.debug_ind == DebugTypes.DONT_RELEASE_COIN_A_LOCK:
+        _debugTweak(self, bid, cursor)
+    elif state_name == "PENDING":
         lock_remaining: int = evm_swap.timeout1 - _chainTime(self, evm_swap)
         if lock_remaining > self._sc_lock_release_min_margin:
             ci_evm = self.ci(evm_swap.evm_coin)
@@ -1408,7 +1489,7 @@ def claimEvmLock(self, bid_id: bytes, cursor) -> None:
 
 def _xmrLockSpendable(self, offer, bid, evm_swap, action_type, cursor) -> bool:
     """Requeue action_type until the XMR lock has unlocked, as adaptor-sig does."""
-    ci_xmr = self.ci(Coins.XMR)
+    ci_xmr = _xmrInterface(self, offer)
     if (
         _findXmrLock(self, offer, bid, evm_swap, cursor)
         and bid.xmr_b_lock_tx.chain_height
@@ -1421,7 +1502,7 @@ def _xmrLockSpendable(self, offer, bid, evm_swap, action_type, cursor) -> bool:
         status = "height not known"
     delay = self.get_delay_retry_seconds()
     self.log.info(
-        f"XMR lock for bid {self.log.id(bid.bid_id)} {status}, sweeping in {delay} seconds."
+        f"{ci_xmr.ticker_mainnet()} lock for bid {self.log.id(bid.bid_id)} {status}, sweeping in {delay} seconds."
     )
     self.logBidEvent(
         bid.bid_id,
@@ -1433,21 +1514,32 @@ def _xmrLockSpendable(self, offer, bid, evm_swap, action_type, cursor) -> bool:
     return False
 
 
-def _sweepJointAddress(self, bid, evm_swap, xmr_pico: int, tx_type, cursor) -> bytes:
+def _sweepAddress(self, ci_xmr, bid, tx_type, cursor) -> str:
+    """Where our lock spend pays, chosen as the adaptor-sig lock B spend does."""
+    coin = Coins(ci_xmr.interface_type())
+    if coin in self.xmr_based_coins:
+        return self.getCachedMainWalletAddress(ci_xmr, cursor)
+    if coin in (Coins.PART_BLIND, Coins.PART_ANON):
+        return self.getCachedStealthAddressForCoin(coin, cursor)
+    return self.getReceiveAddressFromPool(coin, bid.bid_id, tx_type, cursor)
+
+
+def _sweepJointAddress(
+    self, ci_xmr, bid, evm_swap, xmr_pico: int, tx_type, cursor
+) -> bytes:
     """Spend the XMR lock to our wallet once both spend halves are known."""
-    ci_xmr = self.ci(Coins.XMR)
-    kbv, _ = sharedKeys(self, evm_swap)
+    kbv, _ = sharedKeys(self, ci_xmr, evm_swap)
     txid, published = self.sendBLockSpendTx(
         ci_xmr,
         bid,
         tx_type,
         cursor,
         evm_swap.b_lock_tx_id,
-        self.getCachedMainWalletAddress(ci_xmr, cursor),
+        _sweepAddress(self, ci_xmr, bid, tx_type, cursor),
         kbv,
         ci_xmr.sumKeys(evm_swap.evm_kbs, evm_swap.xmr_kbs),
         xmr_pico,
-        0,
+        _lockFeeRate(self, ci_xmr),
         bid.chain_b_height_start or 0,
     )
     if published:
@@ -1465,23 +1557,29 @@ def redeemXmrForEvm(self, bid_id: bytes, cursor) -> None:
 
     _, state_name, revealed = _evmLock(self, offer, bid, evm_swap)
     ensure(state_name == "CLAIMED", f"EVM lock {state_name}, not claimed")
-    evm_swap.xmr_kbs = _revealedKey(self, revealed, evm_swap.xmr_pkbs)
+    ci_xmr = _xmrInterface(self, offer)
+    evm_swap.xmr_kbs = _revealedKey(self, ci_xmr, revealed, evm_swap.xmr_pkbs)
 
     _, xmr_pico = evmAmountsForBid(self, offer, bid)
     if evm_swap.b_lock_tx_id is None:
         # Claimed past timeout1 before we saw the lock
-        ensure(_findXmrLock(self, offer, bid, evm_swap, cursor), "XMR lock not found")
+        ensure(
+            _findXmrLock(self, offer, bid, evm_swap, cursor),
+            f"{ci_xmr.ticker_mainnet()} lock not found",
+        )
     if not _xmrLockSpendable(
         self, offer, bid, evm_swap, ActionTypes.REDEEM_XMR_FOR_EVM, cursor
     ):
         self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
         return
     spend_txid = _sweepJointAddress(
-        self, bid, evm_swap, xmr_pico, TxTypes.XMR_SWAP_B_LOCK_SPEND, cursor
+        self, ci_xmr, bid, evm_swap, xmr_pico, TxTypes.XMR_SWAP_B_LOCK_SPEND, cursor
     )
     bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED)
     self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap, save_in_progress=offer)
-    self.log.info(f"Swept XMR for EVM bid {self.log.id(bid_id)} tx {spend_txid.hex()}")
+    self.log.info(
+        f"Swept {ci_xmr.ticker_mainnet()} for EVM bid {self.log.id(bid_id)} tx {spend_txid.hex()}"
+    )
 
 
 def refundEvmLock(self, bid_id: bytes, cursor) -> None:
@@ -1548,12 +1646,16 @@ def recoverXmrFromEvmRefund(self, bid_id: bytes, cursor) -> None:
     """XMR side: rebuild the joint spend key from the refund, sweep our XMR back."""
     bid, evm_swap = self.getXmrBidFromSession(cursor, bid_id, EvmXmrSwap)
     ensure(bid and evm_swap, f"Bid not found: {self.log.id(bid_id)}.")
-    ensure(evm_swap.b_lock_tx_id is not None, "No Monero lock to recover")
     offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
+    ci_xmr = _xmrInterface(self, offer)
+    ensure(
+        evm_swap.b_lock_tx_id is not None,
+        f"No {ci_xmr.ticker_mainnet()} lock to recover",
+    )
 
     _, state_name, revealed = _evmLock(self, offer, bid, evm_swap)
     ensure(state_name == "REFUNDED", f"EVM lock {state_name}, not refunded")
-    evm_swap.evm_kbs = _revealedKey(self, revealed, evm_swap.evm_pkbs)
+    evm_swap.evm_kbs = _revealedKey(self, ci_xmr, revealed, evm_swap.evm_pkbs)
 
     if not _xmrLockSpendable(
         self, offer, bid, evm_swap, ActionTypes.RECOVER_XMR_FROM_EVM_REFUND, cursor
@@ -1562,12 +1664,12 @@ def recoverXmrFromEvmRefund(self, bid_id: bytes, cursor) -> None:
         return
     _, xmr_pico = evmAmountsForBid(self, offer, bid)
     spend_txid = _sweepJointAddress(
-        self, bid, evm_swap, xmr_pico, TxTypes.XMR_SWAP_B_LOCK_REFUND, cursor
+        self, ci_xmr, bid, evm_swap, xmr_pico, TxTypes.XMR_SWAP_B_LOCK_REFUND, cursor
     )
     bid.setState(BidStates.XMR_SWAP_FAILED_REFUNDED)
     self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap, save_in_progress=offer)
     self.log.info(
-        f"Recovered XMR after EVM refund for bid {self.log.id(bid_id)} tx {spend_txid.hex()}"
+        f"Recovered {ci_xmr.ticker_mainnet()} after EVM refund for bid {self.log.id(bid_id)} tx {spend_txid.hex()}"
     )
 
 
@@ -1615,7 +1717,9 @@ def checkEvmXmrBidState(self, bid_id: bytes, bid, offer):
         elif state == BidStates.XMR_SWAP_LOCK_RELEASED:
             _, state_name, _ = _evmLock(self, offer, bid, evm_swap)
             now: int = _chainTime(self, evm_swap)
-            if _lockEnded(self, bid_id, bid, evm_swap, state_name, we_are_evm, cursor):
+            if _lockEnded(
+                self, bid_id, bid, offer, evm_swap, state_name, we_are_evm, cursor
+            ):
                 pass
             elif we_are_evm:
                 _queueDrip(self, bid_id, evm_swap, cursor)
@@ -1642,13 +1746,16 @@ def checkEvmXmrBidState(self, bid_id: bytes, bid, offer):
                     _confirmedChainTime(self, evm_swap),
                     self._sc_lock_release_min_margin,
                 ):
-                    _queueAction(
-                        self,
-                        bid_id,
-                        ActionTypes.CLAIM_EVM_LOCK,
-                        "Claiming EVM lock",
-                        cursor,
-                    )
+                    if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK:
+                        _debugTweak(self, bid, cursor)
+                    else:
+                        _queueAction(
+                            self,
+                            bid_id,
+                            ActionTypes.CLAIM_EVM_LOCK,
+                            "Claiming EVM lock",
+                            cursor,
+                        )
 
         elif state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
             if we_are_evm:
@@ -1656,7 +1763,7 @@ def checkEvmXmrBidState(self, bid_id: bytes, bid, offer):
                     self,
                     bid_id,
                     ActionTypes.REDEEM_XMR_FOR_EVM,
-                    "Redeeming XMR",
+                    f"Redeeming {_xmrInterface(self, offer).ticker_mainnet()}",
                     cursor,
                 )
             else:
@@ -1678,7 +1785,9 @@ def checkEvmXmrBidState(self, bid_id: bytes, bid, offer):
     return rv
 
 
-def _lockEnded(self, bid_id, bid, evm_swap, state_name, we_are_evm, cursor) -> bool:
+def _lockEnded(
+    self, bid_id, bid, offer, evm_swap, state_name, we_are_evm, cursor
+) -> bool:
     """Move on from a completed EVM lock; False while it is still open."""
     if state_name == "CLAIMED":
         if we_are_evm:
@@ -1692,7 +1801,7 @@ def _lockEnded(self, bid_id, bid, evm_swap, state_name, we_are_evm, cursor) -> b
                 self,
                 bid_id,
                 ActionTypes.RECOVER_XMR_FROM_EVM_REFUND,
-                "Recovering XMR after EVM refund",
+                f"Recovering {_xmrInterface(self, offer).ticker_mainnet()} after EVM refund",
                 cursor,
             )
             return True
@@ -1710,6 +1819,13 @@ def _xmrCheckEvmLock(self, bid_id, bid, offer, evm_swap, cursor) -> None:
     if evm_swap.b_lock_tx_id is None:
         if state_name == "REFUNDED":
             _xmrSideLockEnded(self, bid_id, bid, offer, evm_swap, cursor)
+        elif bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
+            self.log.debug(
+                f"EVM bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
+            )
+            bid.setState(BidStates.BID_STALLED_FOR_TEST)
+            _debugTweak(self, bid, cursor)
+            self.saveBidInSession(bid_id, bid, cursor, evm_swap)
         elif (
             self.countBidEvents(
                 bid, EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE, cursor
@@ -1720,7 +1836,7 @@ def _xmrCheckEvmLock(self, bid_id, bid, offer, evm_swap, cursor) -> None:
                 self,
                 bid_id,
                 ActionTypes.SEND_XMR_LOCK_FOR_EVM,
-                "Sending XMR lock",
+                f"Sending {_xmrInterface(self, offer).ticker_mainnet()} lock",
                 cursor,
             )
         elif state_name in ("PENDING", "READY"):
@@ -1735,7 +1851,7 @@ def _xmrCheckEvmLock(self, bid_id, bid, offer, evm_swap, cursor) -> None:
             self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
             self.commitDB()
         return
-    if _lockEnded(self, bid_id, bid, evm_swap, state_name, False, cursor):
+    if _lockEnded(self, bid_id, bid, offer, evm_swap, state_name, False, cursor):
         return
     if state_name == "READY":
         # A reorg could swap setReady for a refund, reverting our claim and leaking its secret
@@ -1756,12 +1872,12 @@ def _xmrCheckEvmLock(self, bid_id, bid, offer, evm_swap, cursor) -> None:
 def _evmCheckMoneroLock(self, bid_id, bid, offer, evm_swap, cursor) -> None:
     """EVM side: wait for the XMR lock, refund before timeout1 if it doesn't confirm."""
     _, state_name, _ = _evmLock(self, offer, bid, evm_swap)
-    if _lockEnded(self, bid_id, bid, evm_swap, state_name, True, cursor):
+    if _lockEnded(self, bid_id, bid, offer, evm_swap, state_name, True, cursor):
         return
     if state_name != "PENDING":
         return
 
-    ci_xmr = self.ci(Coins.XMR)
+    ci_xmr = _xmrInterface(self, offer)
     found: bool = _findXmrLock(self, offer, bid, evm_swap, cursor)
     if found:
         lock_height = bid.xmr_b_lock_tx.chain_height

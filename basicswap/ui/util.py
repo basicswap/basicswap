@@ -36,6 +36,7 @@ from basicswap.basicswap_util import (
 
 from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey
 import basicswap.protocols.evm_xmr_swap_1 as evm_xmr_swap_1
+from basicswap.interface.base import Curves
 
 PAGE_LIMIT = 1000
 
@@ -199,7 +200,7 @@ def addEvmXmrSwapData(
 ) -> None:
     evm_is_from: bool = Coins(offer.coin_from) in evm_contract_coins
     ci_evm = swap_client.ci(Coins(offer.coin_from if evm_is_from else offer.coin_to))
-    ci_xmr = swap_client.ci(Coins.XMR)
+    ci_xmr = swap_client.ci(Coins(offer.coin_to if evm_is_from else offer.coin_from))
     evm: str = ci_evm.ticker()
     data["evm_xmr_swap"] = True
     data["coin_a_lock_refund_tx_est_final"] = "None"
@@ -230,12 +231,13 @@ def addEvmXmrSwapData(
     data["txns"] = txns
 
     if (
-        evm_swap.evm_kbv
+        ci_xmr.curve_type() == Curves.ed25519
+        and evm_swap.evm_kbv
         and evm_swap.xmr_kbv
         and evm_swap.evm_pkbs
         and evm_swap.xmr_pkbs
     ):
-        kbv, Kbs = evm_xmr_swap_1.sharedKeys(swap_client, evm_swap)
+        kbv, Kbs = evm_xmr_swap_1.sharedKeys(swap_client, ci_xmr, evm_swap)
         data["xmr_b_shared_address"] = ci_xmr.encodeSharedAddress(
             ci_xmr.getPubkey(kbv), Kbs
         )

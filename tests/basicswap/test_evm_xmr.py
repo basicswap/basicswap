@@ -53,6 +53,7 @@ RELEASE_MARGIN = 600
 B_LOCK_MARGIN = 1200
 LOCK_WAIT = 1800
 CONFIRM_ALLOWANCE = 300
+LOCK_DEADLINE = LOCK_WAIT + CONFIRM_ALLOWANCE
 
 
 class FakeLog:
@@ -315,7 +316,9 @@ class EvmXmrDriverTest(unittest.TestCase):
                 evm_coin=int(Coins.ETH),
                 contract_address=self.anvil.contract_address,
             )
-            dleag = ethdrv._setOwnKeys(node, evm_swap, 0, we_are_evm, None)
+            dleag = ethdrv._setOwnKeys(
+                node, node._xmr, evm_swap, 0, we_are_evm, offer_id, None
+            )
             addr = node._eth.getNewAddress()
             if we_are_evm:
                 evm_swap.evm_addr = addr
@@ -339,11 +342,11 @@ class EvmXmrDriverTest(unittest.TestCase):
         ):
             evm_swap = node._store[EvmXmrSwap]
             ethdrv._storePeerMessage(node, evm_swap, peer_msg, peer_is_evm)
-            ethdrv._checkPeerKeys(node, evm_swap, peer_is_evm)
-            ethdrv._checkDistinctKeys(node, evm_swap)
+            ethdrv._checkPeerKeys(node, node._xmr, evm_swap, peer_is_evm, offer_id)
+            ethdrv._checkDistinctKeys(node, node._xmr, evm_swap)
         self.assertEqual(
-            ethdrv.sharedKeys(evm, evm._store[EvmXmrSwap]),
-            ethdrv.sharedKeys(xmr, xmr._store[EvmXmrSwap]),
+            ethdrv.sharedKeys(evm, evm._xmr, evm._store[EvmXmrSwap]),
+            ethdrv.sharedKeys(xmr, xmr._xmr, xmr._store[EvmXmrSwap]),
         )
         return evm, xmr, ledger
 
@@ -394,7 +397,7 @@ class EvmXmrDriverTest(unittest.TestCase):
             )
             receipt = ci.sendTx(
                 lambda tx_nonce: contract.sign_lock(
-                    ci.account, swap, start + LOCK_WAIT, tx_nonce
+                    ci.account, swap, start + LOCK_DEADLINE, tx_nonce
                 ),
                 "lock",
             )
@@ -412,7 +415,7 @@ class EvmXmrDriverTest(unittest.TestCase):
         m.owner = evm_swap.evm_addr
         m.timeout1, m.timeout2, m.timeout3 = t1, t2, t3
         m.lock_tx_id = bytes(receipt["transactionHash"])
-        m.xmr_lock_deadline = start + LOCK_WAIT
+        m.xmr_lock_deadline = start + LOCK_DEADLINE
         payload_hex = "{:02x}".format(MessageTypes.EVM_XMR_LOCK) + m.to_bytes().hex()
         ethdrv.processEvmXmrLock(xmr, lockMsg(payload_hex))
 
@@ -457,7 +460,7 @@ class EvmXmrDriverTest(unittest.TestCase):
     def test_02_refund_when_no_lock_is_mined(self):
         evm, xmr, ledger = self._locked(evm_sees_lock=False)
         self.assertEqual(evm.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
-        self.anvil.warp(LOCK_WAIT - 60)
+        self.anvil.warp(LOCK_DEADLINE - 60)
         self.assertEqual(evm.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
 
         self.anvil.warp(120)
@@ -471,7 +474,7 @@ class EvmXmrDriverTest(unittest.TestCase):
         evm, xmr, ledger = self._pair()
         self.assertEqual(evm.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
         self._deliver_lock(evm, xmr)
-        self.anvil.warp(LOCK_WAIT - CONFIRM_ALLOWANCE + 10)
+        self.anvil.warp(LOCK_DEADLINE - CONFIRM_ALLOWANCE + 10)
         self.assertEqual(xmr.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
         self.assertEqual(ledger.locks, {})
         self.assertEqual(xmr.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
@@ -484,11 +487,11 @@ class EvmXmrDriverTest(unittest.TestCase):
         evm, xmr, ledger = self._pair()
         self.assertEqual(evm.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
         self._deliver_lock(evm, xmr)
-        self.anvil.warp(LOCK_WAIT - CONFIRM_ALLOWANCE + 10)
+        self.anvil.warp(LOCK_DEADLINE - CONFIRM_ALLOWANCE + 10)
         self.assertEqual(xmr.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
         self.assertEqual(ledger.locks, {})
 
-        kbv, Kbs = ethdrv.sharedKeys(xmr, xmr._store[EvmXmrSwap])
+        kbv, Kbs = ethdrv.sharedKeys(xmr, xmr._xmr, xmr._store[EvmXmrSwap])
         xmr._xmr.publishBLockTx(kbv, Kbs, self.XMR_PICO, 0)
         xmr.step()
         self.assertIsNotNone(xmr._store[EvmXmrSwap].b_lock_tx_id)
@@ -597,7 +600,9 @@ class EvmXmrDriverTest(unittest.TestCase):
         dleag[100] ^= 1
         evm_swap.peer_dleag = bytes(dleag)
         with self.assertRaisesRegex(ValueError, "Invalid DLEAG proof"):
-            ethdrv._checkPeerKeys(evm, evm_swap, False)
+            ethdrv._checkPeerKeys(
+                evm, evm._xmr, evm_swap, False, evm._store[Offer].offer_id
+            )
 
     def test_06_lock_resent_after_crash(self):
         evm, _, _ = self._pair()
@@ -697,7 +702,7 @@ class EvmXmrFactoryDriverTest(EvmXmrDriverTest):
             with self.assertRaisesRegex(TemporaryError, "not mined yet"):
                 ethdrv.sendEvmLock(evm, bid_id, None)
             lock = evm._eth.signedHandle(bid_id, "lock")
-            self.anvil.warp(LOCK_WAIT + 10)
+            self.anvil.warp(LOCK_DEADLINE + 10)
         finally:
             EthRpcClient.wait_receipt = wait_receipt
             anvil.request("evm_setAutomine", [True])

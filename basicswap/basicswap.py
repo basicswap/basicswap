@@ -661,7 +661,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )  # Seconds
         self._evm_xmr_lock_wait = self.get_int_setting(
             "evm_xmr_lock_wait", 7200, 3600, 24 * 3600
-        )  # Seconds the EVM side waits for a mined XMR lock before refunding
+        )  # Seconds the XMR side has to send its lock, its coin's confirm allowance is added
         self._redeem_rebroadcast_seconds = self.get_int_setting(
             "redeem_rebroadcast_seconds", 10 * 60, 1, 24 * 3600
         )  # Seconds
@@ -4030,9 +4030,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if swap_type == SwapTypes.EVM_XMR_SWAP:
             coins = {coin_from, coin_to}
-            if not (
-                Coins.XMR in coins and len(coins & set(self.evm_contract_coins)) == 1
-            ):
+            if not (len(coins) == 2 and len(coins & set(self.evm_contract_coins)) == 1):
                 raise ValueError(
                     f"Invalid swap type for: {coin_from.name} -> {coin_to.name}"
                 )
@@ -4350,7 +4348,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # Leave the XMR side time to lock before the EVM side gives up
             min_lock: int = max(
                 evm_xmr_swap_1.MIN_LOCK_SECONDS,
-                evm_xmr_swap_1.xmrLockMinMargin(self)
+                evm_xmr_swap_1.xmrLockMinMargin(
+                    self, self.ci(evm_xmr_swap_1.xmrCoin(self, coin_from, coin_to))
+                )
                 + self._sc_lock_release_min_margin,
             )
             ensure(
@@ -6317,7 +6317,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     leg.is_adaptor and leg.evm_swap.evm_lock_tx_id is not None
                 )
                 leg.lock_remaining_seconds = (
-                    evm_xmr_swap_1.xmrLockRemaining(self, leg.evm_swap)
+                    evm_xmr_swap_1.xmrLockRemaining(
+                        self,
+                        self.ci(
+                            evm_xmr_swap_1.xmrCoin(
+                                self, leg_offer.coin_from, leg_offer.coin_to
+                            )
+                        ),
+                        leg.evm_swap,
+                    )
                     if leg.locks_coin_b
                     else None
                 )

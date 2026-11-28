@@ -17,7 +17,7 @@ class _StubSwapClient:
     """Minimal stand-in exposing the attributes validateSwapType touches."""
 
     balance_only_coins = (Coins.LTC_MWEB,)
-    evm_contract_coins = (Coins.ETH,)
+    evm_contract_coins = (Coins.ETH, Coins.STABLE)
     scriptless_coins = (Coins.XMR, Coins.WOW)
     adaptor_swap_only_coins = (Coins.XMR, Coins.WOW, Coins.BCH)
     coins_without_segwit = (Coins.PIVX, Coins.DASH)
@@ -39,11 +39,16 @@ class ValidateSwapTypeTest(unittest.TestCase):
         self._validate(Coins.ETH, Coins.XMR, SwapTypes.EVM_XMR_SWAP)
         self._validate(Coins.XMR, Coins.ETH, SwapTypes.EVM_XMR_SWAP)
 
-    def test_rejects_eth_btc(self):
+    def test_accepts_evm_with_any_non_evm_coin(self):
+        for coin in (Coins.BTC, Coins.LTC, Coins.PART, Coins.WOW):
+            self._validate(Coins.ETH, coin, SwapTypes.EVM_XMR_SWAP)
+            self._validate(coin, Coins.ETH, SwapTypes.EVM_XMR_SWAP)
+
+    def test_rejects_two_evm_coins(self):
         with self.assertRaises(ValueError):
-            self._validate(Coins.ETH, Coins.BTC, SwapTypes.EVM_XMR_SWAP)
+            self._validate(Coins.ETH, Coins.STABLE, SwapTypes.EVM_XMR_SWAP)
         with self.assertRaises(ValueError):
-            self._validate(Coins.BTC, Coins.ETH, SwapTypes.EVM_XMR_SWAP)
+            self._validate(Coins.STABLE, Coins.ETH, SwapTypes.EVM_XMR_SWAP)
 
     def test_rejects_eth_under_other_swap_types(self):
         # ETH may only be swapped via EVM_XMR_SWAP.
