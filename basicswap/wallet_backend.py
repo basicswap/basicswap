@@ -606,7 +606,11 @@ class ElectrumBackend(WalletBackend):
 
         fee = self._call("blockchain.estimatefee", [blocks])
         if not fee or fee <= 0:
-            raise ValueError(f"No fee estimate for {blocks} blocks")
+            # Secret-hash redeems fetch the rate when sent; a queued action retries a
+            # TemporaryError, any other error fails the bid
+            if blocks in self._cached_fee:
+                return self._cached_fee[blocks]
+            raise TemporaryError(f"No fee estimate for {blocks} blocks")
         self._cached_fee[blocks] = fee
         self._cached_fee_time[blocks] = now
         return fee
