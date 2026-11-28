@@ -1233,7 +1233,7 @@ class TestFunctions(BaseTest):
         pre_bid = ready_bids[0]
         bid, xmr_swap = swap_clients[id_bidder].getXmrBid(pre_bid)
         _, xmr_offer = swap_clients[id_bidder].getXmrOffer(bid.offer_id)
-        pre_txid = ci_to.publishBLockTx(
+        pre_txid, _ = ci_to.publishBLockTx(
             xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate
         )
         logging.info(f"Published an unrecorded coin B lock: {pre_txid.hex()}")
@@ -2880,11 +2880,9 @@ class BasicSwapTest(TestFunctions):
         v = ci.getNewRandomKey()
         s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
-        result = ci.publishBLockTx(v, S, amount, self.test_fee_rate)
-        if isinstance(result, tuple):
-            lock_tx_b_txid, lock_tx_b_vout = result
-        else:
-            lock_tx_b_txid = result
+        lock_tx_b_txid, lock_tx_b_vout = ci.publishBLockTx(
+            v, S, amount, self.test_fee_rate
+        )
 
         addr_out = ci.getNewAddress(True)
         lock_tx_b_spend_txid = ci.spendBLockTx(

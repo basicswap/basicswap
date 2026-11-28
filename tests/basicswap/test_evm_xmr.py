@@ -95,7 +95,7 @@ class FakeXmr(XMRInterface):
     def publishBLockTx(self, kbv, Kbs, amount, feerate, unlock_time=0):
         txid = secrets.token_bytes(32)
         self.ledger.locks[self._addr(kbv, Kbs)] = (txid, amount)
-        return txid
+        return txid, None
 
     def findTxB(
         self, kbv, Kbs, amount, confs, restore_height, bid_sender, check_amount=True

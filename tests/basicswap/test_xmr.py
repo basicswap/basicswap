@@ -1239,11 +1239,7 @@ class Test(BaseTest):
         v = ci.getNewRandomKey()
         s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
-        result = ci.publishBLockTx(v, S, amount, fee_rate)
-        if isinstance(result, tuple):
-            lock_tx_b_txid, lock_tx_b_vout = result
-        else:
-            lock_tx_b_txid = result
+        lock_tx_b_txid, lock_tx_b_vout = ci.publishBLockTx(v, S, amount, fee_rate)
 
         addr_out = ci.getNewAddress(True)
         lock_tx_b_spend_txid = ci.spendBLockTx(
@@ -1272,11 +1268,7 @@ class Test(BaseTest):
         v = ci.getNewRandomKey()
         s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
-        result = ci.publishBLockTx(v, S, amount, fee_rate)
-        if isinstance(result, tuple):
-            lock_tx_b_txid, lock_tx_b_vout = result
-        else:
-            lock_tx_b_txid = result
+        lock_tx_b_txid, lock_tx_b_vout = ci.publishBLockTx(v, S, amount, fee_rate)
 
         addr_out = ci.getNewAddress(True)
         for i in range(20):
@@ -2565,11 +2557,7 @@ class Test(BaseTest):
         v = ci.getNewRandomKey()
         s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
-        result = ci.publishBLockTx(v, S, amount, fee_rate)
-        if isinstance(result, tuple):
-            lock_tx_b_txid, lock_tx_b_vout = result
-        else:
-            lock_tx_b_txid = result
+        lock_tx_b_txid, lock_tx_b_vout = ci.publishBLockTx(v, S, amount, fee_rate)
 
         addr_out = ci.getNewStealthAddress()
         lock_tx_b_spend_txid = None

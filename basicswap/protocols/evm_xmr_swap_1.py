@@ -1344,7 +1344,9 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
                 b_lock_tx, b_lock_vout = funded
                 self.recordSignedBLockTx(b_lock_tx, b_lock_vout, [bid_id], cursor)
             else:
-                b_lock_txid = ci_xmr.publishBLockTx(kbv, Kbs, xmr_pico, fee_rate)
+                b_lock_txid, b_lock_vout = ci_xmr.publishBLockTx(
+                    kbv, Kbs, xmr_pico, fee_rate
+                )
             if b_lock_tx is not None:
                 try:
                     published = ci_xmr.publishTx(b_lock_tx)

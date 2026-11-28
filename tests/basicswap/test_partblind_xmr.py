@@ -204,7 +204,7 @@ class Test(BaseTest):
         v = ci.getNewRandomKey()
         s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
-        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
+        lock_tx_b_txid, _ = ci.publishBLockTx(v, S, amount, fee_rate)
 
         addr_out = ci.getNewStealthAddress()
         lock_tx_b_spend_txid = None

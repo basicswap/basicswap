@@ -149,7 +149,7 @@ class TestXmrPublishBLockTxs(unittest.TestCase):
         ci = FakeXmr()
         ci.pending_destinations = [{"address": ci.lock_address(key(1), key(2))}]
 
-        txid = ci.publishBLockTx(key(1), key(2), 100, 0)
+        txid, _ = ci.publishBLockTx(key(1), key(2), 100, 0)
 
         self.assertEqual(txid, bytes.fromhex("cd" * 32))
         self.assertEqual([m for m, _ in ci.calls if m == "transfer"], [])

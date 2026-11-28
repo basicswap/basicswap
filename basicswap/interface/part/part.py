@@ -1318,7 +1318,7 @@ class PARTInterfaceBlind(PARTInterface):
         output_amount: int,
         feerate: int,
         unlock_time: int = 0,
-    ) -> bytes:
+    ) -> tuple[bytes, int | None]:
         Kbv = self.getPubkey(vkbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
         self._log.debug("sx_addr: {}".format(sx_addr))
@@ -1339,7 +1339,7 @@ class PARTInterfaceBlind(PARTInterface):
         ]
 
         txid = self.rpc_wallet("sendtypeto", params)
-        return bytes.fromhex(txid)
+        return bytes.fromhex(txid), None
 
     def max_batched_lock_outputs(self) -> int:
         # TODO: Confirm the real limit; Particl bounds a tx by size, not output count.
@@ -1680,7 +1680,7 @@ class PARTInterfaceAnon(PARTInterface):
         output_amount: int,
         feerate: int,
         unlock_time: int = 0,
-    ) -> bytes:
+    ) -> tuple[bytes, int | None]:
         Kbv = self.getPubkey(kbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
 
@@ -1700,7 +1700,7 @@ class PARTInterfaceAnon(PARTInterface):
         ]
 
         txid = self.rpc_wallet("sendtypeto", params)
-        return bytes.fromhex(txid)
+        return bytes.fromhex(txid), None
 
     def max_batched_lock_outputs(self) -> int:
         # TODO: Confirm the real limit; Particl bounds a tx by size, not output count.

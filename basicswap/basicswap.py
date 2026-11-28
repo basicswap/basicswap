@@ -14426,17 +14426,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ) is not None:
                 b_lock_tx, b_lock_vout = funded
             else:
-                result = ci_to.publishBLockTx(
+                b_lock_tx_id, b_lock_vout = ci_to.publishBLockTx(
                     xmr_swap.vkbv,
                     xmr_swap.pkbs,
                     bid.amount_to,
                     b_fee_rate,
                     unlock_time=unlock_time,
                 )
-                if isinstance(result, tuple):
-                    b_lock_tx_id, b_lock_vout = result
-                else:
-                    b_lock_tx_id = result
             if b_lock_tx is not None:
                 if recorded is None:
                     self.recordSignedBLockTx(
