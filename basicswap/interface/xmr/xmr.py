@@ -571,6 +571,15 @@ class XMRInterface(CoinInterface):
                     return tx_hash, paid
         return None
 
+    def findPendingBLockTx(self, kbv: bytes, Kbs: bytes):
+        """Txid of a send from our wallet to the joint address, mined or not."""
+        with self._mx_wallet:
+            self.openWallet(self._wallet_filename)
+            in_flight = self.findPendingLockTx(
+                {self.encodeSharedAddress(self.getPubkey(kbv), Kbs)}
+            )
+        return None if in_flight is None else in_flight[0]
+
     def publishBLockTx(
         self,
         kbv: bytes,
@@ -578,7 +587,7 @@ class XMRInterface(CoinInterface):
         output_amount: int,
         feerate: int,
         unlock_time: int = 0,
-    ) -> bytes:
+    ) -> tuple[bytes, int | None]:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
@@ -589,7 +598,7 @@ class XMRInterface(CoinInterface):
 
             in_flight = self.findPendingLockTx({shared_addr})
             if in_flight is not None:
-                return in_flight[0]
+                return in_flight[0], None
 
             params = {
                 "destinations": [{"amount": output_amount, "address": shared_addr}],
@@ -605,7 +614,7 @@ class XMRInterface(CoinInterface):
                 )
             )
             tx_hash: bytes = bytes.fromhex(rv["tx_hash"])
-            return tx_hash
+            return tx_hash, None
 
     def max_batched_lock_outputs(self) -> int:
         # Monero caps a tx at 16 outputs (BULLETPROOF_MAX_OUTPUTS); one is change.

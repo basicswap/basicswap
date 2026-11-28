@@ -52,6 +52,7 @@ from tests.basicswap.util.common import (
     BTC_BASE_RPC_PORT,
     LTC_BASE_RPC_PORT,
     make_boolean,
+    post_json_api,
     read_json_api,
     waitForServer,
     PORT_OFS,
@@ -60,6 +61,7 @@ from tests.basicswap.util.common import (
 from tests.basicswap.test_bch_xmr import (
     BCH_BASE_RPC_PORT,
 )
+from tests.basicswap.util.anvil import Anvil, KEY_0
 from tests.basicswap.util.harness import (
     DASH_RPC_PORT_BASE,
     DECRED_WALLET_RPC_PORT_BASE,
@@ -90,6 +92,7 @@ BITCOINCASH_RPC_PORT_BASE = int(
 )
 DOGECOIN_RPC_PORT_BASE = int(os.getenv("DOGECOIN_RPC_PORT_BASE", DOGE_BASE_RPC_PORT))
 TEST_COINS_LIST = os.getenv("TEST_COINS_LIST", "bitcoin,monero")
+ANVIL_PORT = int(os.getenv("TEST_ANVIL_PORT", "8659"))
 
 NUM_NODES = int(os.getenv("NUM_NODES", 3))
 EXTRA_CONFIG_JSON = json.loads(os.getenv("EXTRA_CONFIG_JSON", "{}"))
@@ -620,6 +623,7 @@ class BaseTestWithPrepare(unittest.TestCase):
     update_thread_xmr = None
     update_thread_dcr = None
     processes = []
+    anvil = None
     btc_addr = None
     ltc_addr = None
     dcr_addr = "SsppG7KLiH52NC7iJmUVGVq89FLS83E5vho"
@@ -659,6 +663,12 @@ class BaseTestWithPrepare(unittest.TestCase):
 
         random.seed(time.time())
 
+        if "ethereum" in cls.test_coins_list:
+            # prepare points the nodes at anvil and its SwapCreator through these
+            cls.anvil = Anvil(ANVIL_PORT)
+            os.environ["ETH_RPC_URL"] = f"http://127.0.0.1:{ANVIL_PORT}"
+            os.environ["ETH_CONTRACT_ADDRESS"] = cls.anvil.contract_address
+
         if os.path.exists(test_path) and not RESET_TEST:
             logging.info(f"Continuing with existing directory: {test_path}")
         else:
@@ -673,6 +683,11 @@ class BaseTestWithPrepare(unittest.TestCase):
         start_processes(cls)
         waitForServer(cls.delay_event, UI_PORT + 0)
         waitForServer(cls.delay_event, UI_PORT + 1)
+
+        if cls.anvil is not None:
+            address = post_json_api(UI_PORT + 0, "wallets/eth/nextdepositaddr", {})
+            txid = cls.anvil.iface(KEY_0).withdrawCoin("1000", address, False)
+            cls.anvil.rpc.wait_receipt(bytes.fromhex(txid))
 
     @classmethod
     def finalise(cls):
@@ -692,6 +707,9 @@ class BaseTestWithPrepare(unittest.TestCase):
         cls.update_thread_xmr = None
         cls.update_thread_dcr = None
         cls.processes = []
+        if cls.anvil is not None:
+            cls.anvil.stop()
+            cls.anvil = None
 
 
 class Test(BaseTestWithPrepare):

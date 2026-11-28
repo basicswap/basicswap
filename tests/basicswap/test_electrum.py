@@ -697,7 +697,7 @@ class Test(TestFunctions):
     electrumx_port = 50001
     test_coin_a = Coins.PART
     test_coin_b_name: str = os.getenv("TEST_COIN_B", "bitcoin")
-    test_coin_b = getCoinIdFromName(test_coin_b_name)
+    test_coin_b = getCoinIdFromName(test_coin_b_name, True)
 
     test_coin_xmr = Coins.XMR
 

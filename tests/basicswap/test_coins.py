@@ -37,9 +37,11 @@ import unittest
 
 from basicswap.basicswap_util import (
     BidStates,
+    DebugTypes,
 )
 from basicswap.chainparams import (
     Coins,
+    evm_contract_coins,
     getCoinIdFromName,
 )
 
@@ -51,7 +53,9 @@ from tests.basicswap.util.common import (
 )
 from tests.basicswap.test_electrum import (
     TestFunctions,
+    getTickerFromCoinId,
     is_reverse_bid,
+    wait_for_bid_state,
     wait_for_bid_states,
     wait_for_offer,
 )
@@ -74,6 +78,105 @@ class Test(TestFunctions):
 
     test_coin_a = getCoinIdFromName(os.getenv("TEST_COIN_A", "bitcoin"), True)
     test_coin_b = getCoinIdFromName(os.getenv("TEST_COIN_B", "monero"), True)
+
+    def isEvmPair(self) -> bool:
+        return bool({self.test_coin_a, self.test_coin_b} & set(evm_contract_coins))
+
+    def requireAdaptorPair(self):
+        # Preselected lock inputs and a chosen destination are adaptor-signature only
+        if self.isEvmPair():
+            self.skipTest("adaptor-signature case")
+
+    def evmBid(self, evm_side_debug=None, follower_debug=None) -> tuple:
+        """Node 0 offers coin A for coin B, node 1 bids; each side's debug state
+        goes on its own bid before node 0 accepts."""
+        evm_port, follower_port = (
+            (self.port_node_0, self.port_node_1)
+            if self.test_coin_a in evm_contract_coins
+            else (self.port_node_1, self.port_node_0)
+        )
+        data = {
+            "addr_from": "-1",
+            "coin_from": getTickerFromCoinId(self.test_coin_a),
+            "coin_to": getTickerFromCoinId(self.test_coin_b),
+            "amt_from": "1.0",
+            "amt_to": "1.0",
+            "lockhrs": "24",
+            "swap_type": "adaptor_sig",
+        }
+        offer_id: str = post_json_api(self.port_node_0, "offers/new", data)["offer_id"]
+        wait_for_offer(self.delay_event, self.port_node_1, offer_id)
+        offer = read_json_api(self.port_node_1, f"offers/{offer_id}")[0]
+        bid_id: str = post_json_api(
+            self.port_node_1,
+            "bids/new",
+            {
+                "offer_id": offer_id,
+                "amount_from": offer["amount_from"],
+                "validmins": 60,
+            },
+        )["bid_id"]
+        wait_for_bid_state(self.delay_event, self.port_node_1, bid_id)
+        wait_for_bid_state(
+            self.delay_event, self.port_node_0, bid_id, BidStates.BID_RECEIVED
+        )
+        for port, debug_ind in (
+            (evm_port, evm_side_debug),
+            (follower_port, follower_debug),
+        ):
+            if debug_ind is not None:
+                post_json_api(port, f"bids/{bid_id}", {"debugind": int(debug_ind)})
+        post_json_api(self.port_node_0, f"bids/{bid_id}", {"accept": True})
+        return bid_id, evm_port, follower_port
+
+    def do_test_evm_follower_never_locks(self):
+        bid_id, evm_port, follower_port = self.evmBid(
+            follower_debug=DebugTypes.BID_STOP_AFTER_COIN_A_LOCK
+        )
+        wait_for_bid_state(
+            self.delay_event, follower_port, bid_id, BidStates.BID_STALLED_FOR_TEST, 240
+        )
+        # Past the EVM side's lock deadline, short of timeout1
+        self.anvil.warp(8 * 3600)
+        wait_for_bid_state(
+            self.delay_event, evm_port, bid_id, BidStates.XMR_SWAP_FAILED_REFUNDED, 240
+        )
+
+    def do_test_evm_claim_after_timeout1(self):
+        bid_id, evm_port, follower_port = self.evmBid(
+            evm_side_debug=DebugTypes.DONT_RELEASE_COIN_A_LOCK
+        )
+        wait_for_bid_state(
+            self.delay_event, evm_port, bid_id, BidStates.XMR_SWAP_LOCK_RELEASED, 240
+        )
+        self.anvil.warp(24 * 3600 + 600)
+        wait_for_bid_states(
+            self.delay_event,
+            bid_id,
+            evm_port,
+            BidStates.SWAP_COMPLETED,
+            follower_port,
+            BidStates.SWAP_COMPLETED,
+            240,
+        )
+
+    def do_test_evm_follower_recovers_after_refund(self):
+        bid_id, evm_port, follower_port = self.evmBid(
+            follower_debug=DebugTypes.BID_DONT_SPEND_COIN_A_LOCK
+        )
+        wait_for_bid_state(
+            self.delay_event, evm_port, bid_id, BidStates.XMR_SWAP_LOCK_RELEASED, 240
+        )
+        self.anvil.warp(48 * 3600 + 600)
+        wait_for_bid_states(
+            self.delay_event,
+            bid_id,
+            evm_port,
+            BidStates.XMR_SWAP_FAILED_REFUNDED,
+            follower_port,
+            BidStates.XMR_SWAP_FAILED_REFUNDED,
+            240,
+        )
 
     @classmethod
     def setUpClass(cls):
@@ -196,6 +299,8 @@ class Test(TestFunctions):
         self.do_test_01_full_swap(self.test_coin_a, self.test_coin_b)
 
     def test_02_leader_recover_a_lock_tx(self):
+        if self.isEvmPair():
+            return self.do_test_evm_follower_never_locks()
         prepare_balance(
             self.delay_event,
             self.test_coin_b,
@@ -207,6 +312,8 @@ class Test(TestFunctions):
         self.do_test_02_leader_recover_a_lock_tx(self.test_coin_a, self.test_coin_b)
 
     def test_03_follower_recover_a_lock_tx(self):
+        if self.isEvmPair():
+            return self.do_test_evm_claim_after_timeout1()
         prepare_balance(
             self.delay_event,
             self.test_coin_b,
@@ -218,6 +325,8 @@ class Test(TestFunctions):
         self.do_test_03_follower_recover_a_lock_tx(self.test_coin_a, self.test_coin_b)
 
     def test_04_follower_recover_b_lock_tx(self):
+        if self.isEvmPair():
+            return self.do_test_evm_follower_recovers_after_refund()
         prepare_balance(
             self.delay_event,
             self.test_coin_b,
@@ -229,6 +338,7 @@ class Test(TestFunctions):
         self.do_test_04_follower_recover_b_lock_tx(self.test_coin_a, self.test_coin_b)
 
     def test_set_destination(self):
+        self.requireAdaptorPair()
         prepare_balance(
             self.delay_event,
             self.test_coin_b,
@@ -305,6 +415,7 @@ class Test(TestFunctions):
         ) > float(wallet_before["balance"]) + float(wallet_before["unconfirmed"])
 
     def test_06_preselect_bid_inputs(self):
+        self.requireAdaptorPair()
         coin_from, coin_to = (self.test_coin_a, self.test_coin_b)
         port_node_from, port_node_to = (self.port_node_0, self.port_node_1)
         logger.info(

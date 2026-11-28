@@ -2246,7 +2246,9 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         lock_vout = findOutput(self.loadTx(b_lock_tx), self.getPkDest(Kbs))
         return self.signTxWithWallet(b_lock_tx), lock_vout
 
-    def publishBLockTx(self, kbv, Kbs, output_amount, feerate, unlock_time: int = 0):
+    def publishBLockTx(
+        self, kbv, Kbs, output_amount, feerate, unlock_time: int = 0
+    ) -> tuple[bytes, int | None]:
         b_lock_tx, lock_vout = self.fundBLockTx(Kbs, output_amount, feerate)
         txid = bytes.fromhex(self.publishTx(b_lock_tx))
         return txid, lock_vout

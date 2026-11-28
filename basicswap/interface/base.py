@@ -169,6 +169,11 @@ class CoinInterface:
         ticker = chainparams[self.coin_type()]["ticker"]
         return ticker
 
+    def display_ticker(self) -> str:
+        return chainparams[self.coin_type()].get(
+            "display_ticker", self.ticker_mainnet()
+        )
+
     def min_amount(self) -> int:
         return chainparams[self.coin_type()][self._network]["min_amount"]
 
@@ -206,6 +211,8 @@ class CoinInterface:
         if "not enough unlocked money" in str_error:
             return True
         if "no unlocked balance" in str_error:
+            return True
+        if "tx not possible" in str_error:
             return True
         if "transaction was rejected by daemon" in str_error:
             return True

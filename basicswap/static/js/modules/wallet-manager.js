@@ -184,7 +184,8 @@ const WalletManager = (function() {
             localStorage.setItem(`${coinSymbol.toLowerCase()}-amount`, amount.toString());
           }
 
-          el.setAttribute('data-original-value', `${amount} ${shortName}`);
+          const displaySymbol = window.CoinManager.getDisplaySymbol(coinName) || shortName;
+          el.setAttribute('data-original-value', `${amount} ${displaySymbol}`);
         }
       }
     });

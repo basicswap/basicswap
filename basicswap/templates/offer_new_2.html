@@ -61,7 +61,11 @@
               <button type="button" data-set-value="{{ h }}" data-target-name="lockhrs" class="py-1 px-2 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md focus:outline-none">{{ h }}h</button>
               {% endfor %}
             </div>
+            {% if data.swap_type == 'evm_xmr_swap' %}
+            <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Length of each of three windows: to lock both coins and release the EVM lock, then for the XMR side to claim it, then for the EVM side to refund it. After that the XMR side can claim again.</p>
+            {% else %}
             <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Maximum time allowed to complete the swap once a bid is accepted. If it isn't finished in time, the locked funds can be refunded{% if data.swap_style != 'xmr' %}; the participate transaction is locked for half this time{% endif %}.</p>
+            {% endif %}
           </div>
           {% endif %}
         </div>

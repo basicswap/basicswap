@@ -3608,7 +3608,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         output_amount: int,
         feerate: int,
         unlock_time: int = 0,
-    ) -> (bytes, int):
+    ) -> tuple[bytes, int | None]:
         b_lock_tx, lock_vout = self.fundBLockTx(Kbs, output_amount, feerate)
         txid = bytes.fromhex(self.publishTx(b_lock_tx))
         return txid, lock_vout

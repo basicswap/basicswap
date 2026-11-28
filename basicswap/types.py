@@ -17,14 +17,25 @@ class WatchedOutput:  # Watch for spends
 
 
 class WatchedScript:  # Watch for txns containing outputs
-    __slots__ = ("bid_id", "script", "tx_type", "swap_type", "ignored_outputs")
+    __slots__ = (
+        "bid_id",
+        "script",
+        "tx_type",
+        "swap_type",
+        "ignored_outputs",
+        "scan_to",
+    )
 
-    def __init__(self, bid_id: bytes, script: bytes, tx_type, swap_type):
+    def __init__(
+        self, bid_id: bytes, script: bytes, tx_type, swap_type, scan_to: int = None
+    ):
         self.bid_id = bid_id
         self.script = script
         self.tx_type = tx_type
         self.swap_type = swap_type
         self.ignored_outputs = set()
+        # The chain height when the watch began; blocks up to it are rescanned
+        self.scan_to = scan_to
 
 
 class WatchedTransaction:
