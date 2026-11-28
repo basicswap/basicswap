@@ -205,6 +205,7 @@ from .network.simplex.routes import (
 )
 from .network.simplex.simplex import encryptMsg
 from .network.bsx_network import BSXNetwork, networkTypeToID
+from .network.onion import Onion
 from .network.util import getMsgPubkey
 import basicswap.config as cfg
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
@@ -508,7 +509,7 @@ def threadPollElectrumChainState(swap_client, coin_type):
     swap_client.log.info(f"Electrum polling thread exiting for {ci.ticker()}")
 
 
-class BasicSwap(BaseApp, BSXNetwork, UIApp):
+class BasicSwap(BaseApp, BSXNetwork, Onion, UIApp):
     ws_server = None
     protocolInterfaces = {
         SwapTypes.SELLER_FIRST: atomic_swap_1.AtomicSwapInterface(),
@@ -591,6 +592,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "check_updates_seconds", 4 * 60 * 60, 60 * 60, 7 * 24 * 60 * 60
         )
         self._last_checked_updates = 0
+        self._last_checked_onion = 0
+        # Stops a concurrent update re-adding a removed client.
+        self._onion_lock = threading.Lock()
         self._latest_version = None
         self._update_available = False
         self._notifications_enabled = self.settings.get("notifications_enabled", True)
@@ -771,6 +775,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self.with_coins_override = extra_opts.get("with_coins", set())
         self.without_coins_override = extra_opts.get("without_coins", set())
+
+        # Coin setup already uses Tor, e.g. the XMR daemon probe.
+        if self.use_tor_proxy and not self._transient_instance:
+            self.waitForTor()
 
         for c in Coins:
             if c in chainparams:
@@ -1464,6 +1472,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             raise RuntimeError(
                 "SQLite {} or higher required.".format(".".join(MIN_SQLITE_VERSION))
             )
+
+        if self.use_tor_proxy:
+            self._ensureOnion()
 
         self._cleanupOldSettings()
 
@@ -16363,6 +16374,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if self.checkDue(now, self._last_checked_pending_sweeps, 60):
                 self._retryPendingSweeps()
                 self._last_checked_pending_sweeps = now
+
+            if self.checkDue(now, self._last_checked_onion, 300):
+                self._ensureOnion()
 
         except Exception as ex:
             self.logException(f"update {ex}")

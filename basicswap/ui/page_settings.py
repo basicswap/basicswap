@@ -111,7 +111,7 @@ def page_settings(self, url_split, post_string):
                             "Cannot disable the password while 'allowed_hosts' contains '*' (DNS-rebinding protection)."
                         )
                     else:
-                        swap_client.editGeneralSettings({"client_auth_hash": ""})
+                        swap_client.setClientAuthHash("")
                         messages.append("Client Authentication disabled.")
                 else:
                     new_password = get_data_entry_or(form_data, "new_password", "")
@@ -123,8 +123,8 @@ def page_settings(self, url_split, post_string):
                     elif new_password != confirm_password:
                         err_messages.append("Passwords do not match.")
                     else:
-                        swap_client.editGeneralSettings(
-                            {"client_auth_hash": rfc2440_hash_password(new_password)}
+                        swap_client.setClientAuthHash(
+                            rfc2440_hash_password(new_password)
                         )
                         if auth_enabled:
                             self._drop_other_sessions(self._get_session_cookie())
